@@ -1,0 +1,10 @@
+{
+  "method": "xgboost",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0010\\roadtraffic_10000.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\roadtraffic_10000.xes.gz",
+  "train_prefixes": 248,
+  "test_prefixes": 5460,
+  "mae": 19953006.0,
+  "r2": -0.38149309158325195,
+  "status": "ok"
+}
