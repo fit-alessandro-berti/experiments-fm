@@ -5,9 +5,12 @@ import argparse
 import json
 from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parent
+
 DEFAULT_ROOTS = [
-    Path("next_activity_classification/results"),
-    Path("remaining_time_prediction/results"),
+    PROJECT_ROOT / "next_activity_classification" / "results",
+    PROJECT_ROOT / "remaining_time_prediction" / "results",
 ]
 
 
@@ -72,4 +75,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
