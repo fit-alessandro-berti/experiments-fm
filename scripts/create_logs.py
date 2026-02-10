@@ -7,8 +7,9 @@ from pathlib import Path
 import pm4py
 
 BASE_DIR = Path(__file__).resolve().parent
-BASE_LOGS_DIR = BASE_DIR / "base_logs"
-OUTPUT_DIR = BASE_DIR / "logs"
+PROJECT_ROOT = BASE_DIR.parent
+BASE_LOGS_DIR = PROJECT_ROOT / "base_logs"
+OUTPUT_DIR = PROJECT_ROOT / "logs"
 TRAINING_DIR = OUTPUT_DIR / "training"
 TEST_DIR = OUTPUT_DIR / "test"
 SEED = 42
