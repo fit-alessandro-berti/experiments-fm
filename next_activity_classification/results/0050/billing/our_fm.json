@@ -1,0 +1,7 @@
+{
+  "method": "our_fm",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0050\\billing.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\billing.xes.gz",
+  "accuracy": 0.915,
+  "status": "ok"
+}
