@@ -1,0 +1,8 @@
+{
+  "method": "our_fm",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0200\\sepsis.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\sepsis.xes.gz",
+  "mae": 2568072.96,
+  "r2": 0.0429,
+  "status": "ok"
+}
