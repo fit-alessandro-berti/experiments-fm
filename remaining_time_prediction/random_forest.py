@@ -131,6 +131,13 @@ def main() -> None:
                 continue
 
             log_name = log_name_from_path(train_log_path)
+            output_dir = args.results_dir / percentage / log_name
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / f"{args.method_name}.json"
+            if output_path.exists():
+                print(f"Skipping existing result: {output_path}")
+                continue
+
             result = evaluate_log(
                 train_log_path=train_log_path,
                 test_log_path=test_log_path,
@@ -140,9 +147,6 @@ def main() -> None:
                 timestamp_key=args.timestamp_key,
             )
 
-            output_dir = args.results_dir / percentage / log_name
-            output_dir.mkdir(parents=True, exist_ok=True)
-            output_path = output_dir / f"{args.method_name}.json"
             output_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
             print(f"Wrote {output_path}")
 
