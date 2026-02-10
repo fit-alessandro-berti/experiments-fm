@@ -1,0 +1,10 @@
+{
+  "method": "random_forest",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\1000\\helpdesk.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\helpdesk.xes.gz",
+  "train_prefixes": 13423,
+  "test_prefixes": 3345,
+  "mae": 428.7283308312614,
+  "r2": 0.8334462628949327,
+  "status": "ok"
+}

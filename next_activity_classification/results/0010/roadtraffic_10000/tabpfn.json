@@ -1,0 +1,24 @@
+{
+  "method": "tabpfn",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0010\\roadtraffic_10000.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\roadtraffic_10000.xes.gz",
+  "train_prefixes_raw": 248,
+  "test_prefixes_raw": 5439,
+  "train_prefixes": 248,
+  "test_prefixes": 5439,
+  "train_classes": 8,
+  "test_classes": 8,
+  "kept_train_classes_top_k": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "many_class_strategy": "top_10_train_frequency_filter",
+  "accuracy": 0.9303180731752161,
+  "status": "ok"
+}

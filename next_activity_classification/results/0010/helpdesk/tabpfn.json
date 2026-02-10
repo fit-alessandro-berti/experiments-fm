@@ -1,0 +1,22 @@
+{
+  "method": "tabpfn",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0010\\helpdesk.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\helpdesk.xes.gz",
+  "train_prefixes_raw": 132,
+  "test_prefixes_raw": 3320,
+  "train_prefixes": 132,
+  "test_prefixes": 3320,
+  "train_classes": 6,
+  "test_classes": 6,
+  "kept_train_classes_top_k": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "many_class_strategy": "top_10_train_frequency_filter",
+  "accuracy": 0.8006024096385542,
+  "status": "ok"
+}
