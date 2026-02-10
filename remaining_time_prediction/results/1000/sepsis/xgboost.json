@@ -1,0 +1,10 @@
+{
+  "method": "xgboost",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\1000\\sepsis.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\sepsis.xes.gz",
+  "train_prefixes": 11345,
+  "test_prefixes": 2819,
+  "mae": 3976867.25,
+  "r2": -0.248183012008667,
+  "status": "ok"
+}
