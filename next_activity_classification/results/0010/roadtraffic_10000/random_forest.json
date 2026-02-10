@@ -1,0 +1,11 @@
+{
+  "method": "random_forest",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0010\\roadtraffic_10000.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\roadtraffic_10000.xes.gz",
+  "train_prefixes": 248,
+  "test_prefixes": 5439,
+  "train_classes": 8,
+  "test_classes": 8,
+  "accuracy": 0.9181834896120611,
+  "status": "ok"
+}

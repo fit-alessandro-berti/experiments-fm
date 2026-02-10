@@ -1,0 +1,11 @@
+{
+  "method": "random_forest",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\1000\\helpdesk.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\helpdesk.xes.gz",
+  "train_prefixes": 13423,
+  "test_prefixes": 3345,
+  "train_classes": 13,
+  "test_classes": 11,
+  "accuracy": 0.7769805680119581,
+  "status": "ok"
+}
