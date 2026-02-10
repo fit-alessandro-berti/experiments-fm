@@ -164,6 +164,7 @@ def render_table(
 
 def main() -> None:
     repo_root = Path(__file__).resolve().parent
+    output_path = repo_root / "preliminary_output.tex"
 
     parser = argparse.ArgumentParser(
         description="Build LaTeX summary tables from classification/regression experiment JSON results."
@@ -194,11 +195,6 @@ def main() -> None:
         nargs="*",
         default=None,
         help="Optional explicit list of log names (without extension).",
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=repo_root / "preliminary_output.tex",
     )
     args = parser.parse_args()
 
@@ -247,8 +243,8 @@ def main() -> None:
     )
 
     tex_content = "\n\n".join([table_accuracy, table_mae, table_r2]) + "\n"
-    args.output.write_text(tex_content, encoding="utf-8")
-    print(f"Wrote {args.output}")
+    output_path.write_text(tex_content, encoding="utf-8")
+    print(f"Wrote {output_path}")
 
 
 if __name__ == "__main__":
