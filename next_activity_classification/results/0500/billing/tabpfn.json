@@ -1,0 +1,26 @@
+{
+  "method": "tabpfn",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0500\\billing.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\billing.xes.gz",
+  "train_prefixes_raw": 140694,
+  "test_prefixes_raw": 70440,
+  "train_prefixes": 10000,
+  "test_prefixes": 10000,
+  "train_classes": 10,
+  "test_classes": 10,
+  "kept_train_classes_top_k": [
+    0,
+    1,
+    4,
+    5,
+    6,
+    8,
+    12,
+    13,
+    14,
+    16
+  ],
+  "many_class_strategy": "top_10_train_frequency_filter",
+  "accuracy": 0.9032,
+  "status": "ok"
+}

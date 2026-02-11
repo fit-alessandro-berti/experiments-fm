@@ -1,0 +1,26 @@
+{
+  "method": "tabpfn",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0500\\sepsis.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\sepsis.xes.gz",
+  "train_prefixes_raw": 5522,
+  "test_prefixes_raw": 2819,
+  "train_prefixes": 5407,
+  "test_prefixes": 2763,
+  "train_classes": 10,
+  "test_classes": 10,
+  "kept_train_classes_top_k": [
+    1,
+    2,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    15
+  ],
+  "many_class_strategy": "top_10_train_frequency_filter",
+  "accuracy": 0.6862106406080347,
+  "status": "ok"
+}
