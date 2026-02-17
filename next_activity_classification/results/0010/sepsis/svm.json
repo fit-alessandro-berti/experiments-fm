@@ -1,0 +1,11 @@
+{
+  "method": "svm",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0010\\sepsis.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\sepsis.xes.gz",
+  "train_prefixes": 235,
+  "test_prefixes": 2797,
+  "train_classes": 11,
+  "test_classes": 12,
+  "accuracy": 0.41687522345370037,
+  "status": "ok"
+}

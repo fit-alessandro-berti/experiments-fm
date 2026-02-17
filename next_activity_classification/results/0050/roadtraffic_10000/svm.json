@@ -1,0 +1,11 @@
+{
+  "method": "svm",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0050\\roadtraffic_10000.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\roadtraffic_10000.xes.gz",
+  "train_prefixes": 1132,
+  "test_prefixes": 5460,
+  "train_classes": 10,
+  "test_classes": 10,
+  "accuracy": 0.8415750915750916,
+  "status": "ok"
+}

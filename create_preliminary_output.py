@@ -123,6 +123,17 @@ def style_metric(value_text: str, rank: int | None) -> str:
     return value_text
 
 
+def compute_row_avg_stdev(values: list[float | None]) -> tuple[float | None, float | None]:
+    present_values = [value for value in values if value is not None]
+    if not present_values:
+        return None, None
+    avg = sum(present_values) / len(present_values)
+    if len(present_values) == 1:
+        return avg, 0.0
+    variance = sum((value - avg) ** 2 for value in present_values) / len(present_values)
+    return avg, math.sqrt(variance)
+
+
 def render_table(
     title: str,
     label: str,
@@ -135,8 +146,9 @@ def render_table(
     transform: Callable[[float], float] | None = None,
     higher_is_better: bool = True,
 ) -> str:
-    column_count = len(logs) * len(percentages)
-    col_spec = "l" + ("c" * column_count)
+    base_column_count = len(logs) * len(percentages)
+    column_count = base_column_count + 2
+    col_spec = "l" + ("c" * base_column_count) + "|cc"
     lines: list[str] = []
     lines.append(r"\begin{table}[ht]")
     lines.append(r"\centering")
@@ -152,11 +164,13 @@ def render_table(
         first_header_cells.append(
             rf"\multicolumn{{{len(percentages)}}}{{c}}{{\textbf{{{latex_escape(log_name)}}}}}"
         )
+    first_header_cells.append(r"\multicolumn{2}{c}{\textbf{Summary}}")
     lines.append(" & ".join(first_header_cells) + r" \\")
 
     second_header_cells = [""]
     for _log_name in logs:
         second_header_cells.extend([latex_escape(percentage) for percentage in percentages])
+    second_header_cells.extend([r"\textbf{Avg}", r"\textbf{Stdev}"])
     lines.append(" & ".join(second_header_cells) + r" \\")
     lines.append(r"\hline")
 
@@ -170,8 +184,11 @@ def render_table(
                 if value is not None and transform is not None:
                     value = transform(value)
                 row_values.append(value)
+        avg, stdev = compute_row_avg_stdev(row_values)
+        row_values.extend([avg, stdev])
         values_by_method.append(row_values)
 
+    higher_is_better_by_column = ([higher_is_better] * base_column_count) + [higher_is_better, False]
     ranks_by_value_per_column: list[dict[float, int]] = []
     for column_idx in range(column_count):
         present_values = [
@@ -179,7 +196,7 @@ def render_table(
             for method_values in values_by_method
             if method_values[column_idx] is not None
         ]
-        unique_values = sorted(set(present_values), reverse=higher_is_better)
+        unique_values = sorted(set(present_values), reverse=higher_is_better_by_column[column_idx])
         top_values = unique_values[:3]
         ranks_by_value_per_column.append({value: rank for rank, value in enumerate(top_values)})
 
@@ -282,7 +299,27 @@ def main() -> None:
         decimals=3,
     )
 
-    tex_content = "\n\n".join([table_accuracy, table_mae, table_r2]) + "\n"
+    header = "\n".join(
+        [
+            r"\documentclass{article}",
+            r"\usepackage{graphicx} % Required for inserting images",
+            r"\usepackage{xcolor}",
+            "",
+            r"\title{Trial123}",
+            r"\author{a.berti }",
+            r"\date{February 2026}",
+            "",
+            r"\begin{document}",
+            "",
+            r"\maketitle",
+            "",
+            r"\section{Introduction}",
+            "",
+        ]
+    )
+
+    body = "\n\n".join([table_accuracy, table_mae, table_r2])
+    tex_content = header + body + "\n\n\\end{document}\n"
     output_path.write_text(tex_content, encoding="utf-8")
     print(f"Wrote {output_path}")
 
