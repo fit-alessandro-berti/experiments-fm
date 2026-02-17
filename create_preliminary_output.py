@@ -81,10 +81,11 @@ def method_sort_key(method_name: str) -> tuple[int, str]:
         "random_forest": 1,
         "knn": 2,
         "svm": 3,
-        "svr": 4,
-        "xgboost": 5,
-        "lightgbm": 6,
-        "tabpfn": 7,
+        "gaussian_nb": 4,
+        "svr": 5,
+        "xgboost": 6,
+        "lightgbm": 7,
+        "tabpfn": 8,
     }
     return priority.get(method_name, 100), method_name
 

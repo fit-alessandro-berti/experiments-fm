@@ -1,0 +1,12 @@
+{
+  "method": "gaussian_nb",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0030\\helpdesk.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\helpdesk.xes.gz",
+  "train_prefixes": 407,
+  "test_prefixes": 3297,
+  "train_classes": 5,
+  "test_classes": 5,
+  "var_smoothing": 1e-09,
+  "accuracy": 0.4695177434030937,
+  "status": "ok"
+}
