@@ -1,0 +1,10 @@
+{
+  "method": "lightgbm",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0030\\sepsis.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\sepsis.xes.gz",
+  "train_prefixes": 344,
+  "test_prefixes": 2819,
+  "mae": 6220240.714660722,
+  "r2": -1.2748345909463779,
+  "status": "ok"
+}

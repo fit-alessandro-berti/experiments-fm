@@ -1,0 +1,11 @@
+{
+  "method": "knn",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0005\\receipt.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\receipt.xes.gz",
+  "train_prefixes": 42,
+  "test_prefixes": 1489,
+  "k": 10,
+  "mae": 715278.886970047,
+  "r2": -3.19935008136585,
+  "status": "ok"
+}

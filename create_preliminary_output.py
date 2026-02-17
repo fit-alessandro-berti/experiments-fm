@@ -78,7 +78,10 @@ def load_results(results_dir: Path) -> tuple[set[str], dict[str, dict[str, dict[
 def method_sort_key(method_name: str) -> tuple[int, str]:
     priority = {
         "random_forest": 0,
-        "tabpfn": 1,
+        "knn": 1,
+        "xgboost": 2,
+        "lightgbm": 3,
+        "tabpfn": 4,
     }
     return priority.get(method_name, 100), method_name
 

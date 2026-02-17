@@ -1,0 +1,10 @@
+{
+  "method": "lightgbm",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0050\\helpdesk.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\helpdesk.xes.gz",
+  "train_prefixes": 681,
+  "test_prefixes": 3345,
+  "mae": 478.61629728559893,
+  "r2": 0.808889982375797,
+  "status": "ok"
+}

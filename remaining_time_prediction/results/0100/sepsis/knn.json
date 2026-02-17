@@ -1,0 +1,11 @@
+{
+  "method": "knn",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0100\\sepsis.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\sepsis.xes.gz",
+  "train_prefixes": 1080,
+  "test_prefixes": 2819,
+  "k": 10,
+  "mae": 3612410.0854203617,
+  "r2": -0.0712576338939146,
+  "status": "ok"
+}

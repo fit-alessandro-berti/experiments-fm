@@ -1,0 +1,11 @@
+{
+  "method": "lightgbm",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0005\\roadtraffic_10000.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\roadtraffic_10000.xes.gz",
+  "train_prefixes": 121,
+  "test_prefixes": 5430,
+  "train_classes": 7,
+  "test_classes": 7,
+  "accuracy": 0.8429097605893185,
+  "status": "ok"
+}
