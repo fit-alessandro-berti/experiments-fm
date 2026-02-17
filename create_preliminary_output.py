@@ -77,13 +77,14 @@ def load_results(results_dir: Path) -> tuple[set[str], dict[str, dict[str, dict[
 
 def method_sort_key(method_name: str) -> tuple[int, str]:
     priority = {
-        "random_forest": 0,
-        "knn": 1,
-        "svm": 2,
-        "svr": 3,
-        "xgboost": 4,
-        "lightgbm": 5,
-        "tabpfn": 6,
+        "linear_regression": 0,
+        "random_forest": 1,
+        "knn": 2,
+        "svm": 3,
+        "svr": 4,
+        "xgboost": 5,
+        "lightgbm": 6,
+        "tabpfn": 7,
     }
     return priority.get(method_name, 100), method_name
 
@@ -146,6 +147,11 @@ def render_table(
     transform: Callable[[float], float] | None = None,
     higher_is_better: bool = True,
 ) -> str:
+    color_legend = (
+        r"\textcolor{green}{\textbf{green}} = best, "
+        r"\textcolor{violet}{\textit{violet}} = second best, "
+        r"\textcolor{orange}{orange} = third best."
+    )
     base_column_count = len(logs) * len(percentages)
     column_count = base_column_count + 2
     col_spec = "l" + ("c" * base_column_count) + "|cc"
@@ -153,7 +159,7 @@ def render_table(
     lines.append(r"\begin{table}[ht]")
     lines.append(r"\centering")
     lines.append(r"\small")
-    lines.append(rf"\caption{{{title}}}")
+    lines.append(rf"\caption{{{title} {color_legend}}}")
     lines.append(rf"\label{{{label}}}")
     lines.append(r"\resizebox{\textwidth}{!}{%")
     lines.append(rf"\begin{{tabular}}{{{col_spec}}}")
@@ -262,12 +268,13 @@ def main() -> None:
     cls_methods, cls_data = load_results(args.classification_results)
     reg_methods, reg_data = load_results(args.regression_results)
 
-    all_methods = sorted(cls_methods.union(reg_methods), key=method_sort_key)
+    classification_methods = sorted(cls_methods, key=method_sort_key)
+    regression_methods = sorted(reg_methods, key=method_sort_key)
 
     table_accuracy = render_table(
         title="Classification accuracy.",
         label="tab:classification-accuracy",
-        methods=all_methods,
+        methods=classification_methods,
         logs=logs,
         percentages=args.percentages,
         data=cls_data,
@@ -278,7 +285,7 @@ def main() -> None:
     table_mae = render_table(
         title="Regression MAE.",
         label="tab:regression-mae",
-        methods=all_methods,
+        methods=regression_methods,
         logs=logs,
         percentages=args.percentages,
         data=reg_data,
@@ -291,7 +298,7 @@ def main() -> None:
     table_r2 = render_table(
         title=r"Regression $R^2$.",
         label="tab:regression-r2",
-        methods=all_methods,
+        methods=regression_methods,
         logs=logs,
         percentages=args.percentages,
         data=reg_data,
