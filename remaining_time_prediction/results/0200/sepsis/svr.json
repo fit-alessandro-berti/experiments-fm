@@ -1,0 +1,10 @@
+{
+  "method": "svr",
+  "train_log": "/home/berti/experiments-fm/logs/training/0200/sepsis.xes.gz",
+  "test_log": "/home/berti/experiments-fm/logs/test/sepsis.xes.gz",
+  "train_prefixes": 2276,
+  "test_prefixes": 2819,
+  "mae": 2941476.6646005795,
+  "r2": -0.17877497871877956,
+  "status": "ok"
+}
