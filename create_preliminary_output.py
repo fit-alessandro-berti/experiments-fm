@@ -79,9 +79,11 @@ def method_sort_key(method_name: str) -> tuple[int, str]:
     priority = {
         "random_forest": 0,
         "knn": 1,
-        "xgboost": 2,
-        "lightgbm": 3,
-        "tabpfn": 4,
+        "svm": 2,
+        "svr": 3,
+        "xgboost": 4,
+        "lightgbm": 5,
+        "tabpfn": 6,
     }
     return priority.get(method_name, 100), method_name
 
@@ -111,6 +113,16 @@ def format_metric(value: float | None, decimals: int) -> str:
     return f"{value:.{decimals}f}"
 
 
+def style_metric(value_text: str, rank: int | None) -> str:
+    if rank == 0:
+        return rf"\textcolor{{green}}{{\textbf{{{value_text}}}}}"
+    if rank == 1:
+        return rf"\textcolor{{violet}}{{\textit{{{value_text}}}}}"
+    if rank == 2:
+        return rf"\textcolor{{orange}}{{{value_text}}}"
+    return value_text
+
+
 def render_table(
     title: str,
     label: str,
@@ -121,6 +133,7 @@ def render_table(
     metric_keys: list[str],
     decimals: int,
     transform: Callable[[float], float] | None = None,
+    higher_is_better: bool = True,
 ) -> str:
     column_count = len(logs) * len(percentages)
     col_spec = "l" + ("c" * column_count)
@@ -147,15 +160,38 @@ def render_table(
     lines.append(" & ".join(second_header_cells) + r" \\")
     lines.append(r"\hline")
 
+    values_by_method: list[list[float | None]] = []
     for method in methods:
-        row_cells = [latex_escape(method)]
+        row_values: list[float | None] = []
         for log_name in logs:
             for percentage in percentages:
                 payload = data.get(method, {}).get(log_name, {}).get(percentage)
                 value = get_numeric_metric(payload, metric_keys)
                 if value is not None and transform is not None:
                     value = transform(value)
-                row_cells.append(format_metric(value, decimals))
+                row_values.append(value)
+        values_by_method.append(row_values)
+
+    ranks_by_value_per_column: list[dict[float, int]] = []
+    for column_idx in range(column_count):
+        present_values = [
+            method_values[column_idx]
+            for method_values in values_by_method
+            if method_values[column_idx] is not None
+        ]
+        unique_values = sorted(set(present_values), reverse=higher_is_better)
+        top_values = unique_values[:3]
+        ranks_by_value_per_column.append({value: rank for rank, value in enumerate(top_values)})
+
+    for method_idx, method in enumerate(methods):
+        row_cells = [latex_escape(method)]
+        for column_idx, value in enumerate(values_by_method[method_idx]):
+            value_text = format_metric(value, decimals)
+            if value is None:
+                row_cells.append(value_text)
+                continue
+            rank = ranks_by_value_per_column[column_idx].get(value)
+            row_cells.append(style_metric(value_text, rank))
         lines.append(" & ".join(row_cells) + r" \\")
 
     lines.append(r"\hline")
@@ -232,6 +268,7 @@ def main() -> None:
         metric_keys=["mae", "mae_seconds"],
         decimals=2,
         transform=lambda value: value / 3600.0,
+        higher_is_better=False,
     )
 
     table_r2 = render_table(
