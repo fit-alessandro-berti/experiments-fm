@@ -1,0 +1,12 @@
+{
+  "method": "tabpfn",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0100\\sepsis.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\sepsis.xes.gz",
+  "train_prefixes_raw": 1080,
+  "test_prefixes_raw": 2819,
+  "train_prefixes": 1080,
+  "test_prefixes": 2819,
+  "mae": 3913780.3451733165,
+  "r2": -0.2848692728196882,
+  "status": "ok"
+}

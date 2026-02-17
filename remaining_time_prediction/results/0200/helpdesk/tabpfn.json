@@ -1,0 +1,12 @@
+{
+  "method": "tabpfn",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0200\\helpdesk.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\helpdesk.xes.gz",
+  "train_prefixes_raw": 2683,
+  "test_prefixes_raw": 3345,
+  "train_prefixes": 2683,
+  "test_prefixes": 3345,
+  "mae": 411.07561016773184,
+  "r2": 0.8566191975692882,
+  "status": "ok"
+}
