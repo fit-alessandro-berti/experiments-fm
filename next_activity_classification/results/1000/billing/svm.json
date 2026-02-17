@@ -1,0 +1,11 @@
+{
+  "method": "svm",
+  "train_log": "/home/berti/experiments-fm/logs/training/1000/billing.xes.gz",
+  "test_log": "/home/berti/experiments-fm/logs/test/billing.xes.gz",
+  "train_prefixes": 280919,
+  "test_prefixes": 70440,
+  "train_classes": 18,
+  "test_classes": 17,
+  "accuracy": 0.8832481544576944,
+  "status": "ok"
+}

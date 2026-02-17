@@ -1,0 +1,10 @@
+{
+  "method": "svr",
+  "train_log": "/home/berti/experiments-fm/logs/training/0500/helpdesk.xes.gz",
+  "test_log": "/home/berti/experiments-fm/logs/test/helpdesk.xes.gz",
+  "train_prefixes": 6685,
+  "test_prefixes": 3345,
+  "mae": 1069.7422821129126,
+  "r2": 0.3482555630893268,
+  "status": "ok"
+}

@@ -1,0 +1,10 @@
+{
+  "method": "svr",
+  "train_log": "/home/berti/experiments-fm/logs/training/0500/roadtraffic_10000.xes.gz",
+  "test_log": "/home/berti/experiments-fm/logs/test/roadtraffic_10000.xes.gz",
+  "train_prefixes": 10884,
+  "test_prefixes": 5460,
+  "mae": 23840618.05393864,
+  "r2": -0.05858752406046874,
+  "status": "ok"
+}
