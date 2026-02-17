@@ -1,0 +1,10 @@
+{
+  "method": "linear_regression",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0500\\roadtraffic_10000.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\roadtraffic_10000.xes.gz",
+  "train_prefixes": 10884,
+  "test_prefixes": 5460,
+  "mae": 17135048.159556944,
+  "r2": 0.2848733975811246,
+  "status": "ok"
+}

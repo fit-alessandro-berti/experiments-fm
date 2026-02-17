@@ -1,0 +1,10 @@
+{
+  "method": "linear_regression",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0005\\sepsis.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\sepsis.xes.gz",
+  "train_prefixes": 77,
+  "test_prefixes": 2819,
+  "mae": 3884356.43294118,
+  "r2": -0.4513767068254775,
+  "status": "ok"
+}

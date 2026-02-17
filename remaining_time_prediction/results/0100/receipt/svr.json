@@ -1,0 +1,10 @@
+{
+  "method": "svr",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0100\\receipt.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\receipt.xes.gz",
+  "train_prefixes": 543,
+  "test_prefixes": 1489,
+  "mae": 229148.29179231738,
+  "r2": -0.15637780272334667,
+  "status": "ok"
+}
