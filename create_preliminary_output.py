@@ -146,6 +146,25 @@ def load_semicolon_table(path: Path) -> list[dict[str, str]]:
     return rows
 
 
+def load_comma_table(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+
+    lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if not lines:
+        return []
+
+    header = lines[0].split(",")
+    rows: list[dict[str, str]] = []
+    for line in lines[1:]:
+        fields = line.split(",")
+        if len(fields) < len(header):
+            fields = fields + [""] * (len(header) - len(fields))
+        rows.append({key: fields[idx] for idx, key in enumerate(header)})
+
+    return rows
+
+
 def load_act_time_corr_metrics(path: Path) -> dict[str, dict[str, float]]:
     rows = load_semicolon_table(path)
     metrics_by_log: dict[str, dict[str, float]] = {}
@@ -514,6 +533,39 @@ def render_metric_gap_correlation_table(
         lines.append(
             rf"{latex_escape(metric_name)} & {corr_text} & {sample_size} \\"
         )
+
+    lines.append(r"\hline")
+    lines.append(r"\end{tabular}")
+    lines.append(r"}")
+    lines.append(r"\end{table}")
+    return "\n".join(lines)
+
+
+def render_csv_table(
+    title: str,
+    label: str,
+    rows: list[dict[str, str]],
+    column_order: list[str],
+    column_labels: dict[str, str],
+) -> str:
+    col_spec = "l" + ("c" * (len(column_order) - 1))
+    lines: list[str] = []
+    lines.append(r"\begin{table}[ht]")
+    lines.append(r"\centering")
+    lines.append(r"\small")
+    lines.append(rf"\caption{{{title}}}")
+    lines.append(rf"\label{{{label}}}")
+    lines.append(r"\resizebox{\textwidth}{!}{%")
+    lines.append(rf"\begin{{tabular}}{{{col_spec}}}")
+    lines.append(r"\hline")
+
+    header_cells = [rf"\textbf{{{latex_escape(column_labels.get(col, col))}}}" for col in column_order]
+    lines.append(" & ".join(header_cells) + r" \\")
+    lines.append(r"\hline")
+
+    for row in rows:
+        row_cells = [latex_escape(row.get(col, "")) for col in column_order]
+        lines.append(" & ".join(row_cells) + r" \\")
 
     lines.append(r"\hline")
     lines.append(r"\end{tabular}")
@@ -1137,6 +1189,8 @@ def main() -> None:
     output_path = repo_root / "preliminary_output.tex"
     buckets_path = repo_root / "other_data" / "buckets.txt"
     act_time_corr_path = repo_root / "other_data" / "act_time_corr_metrics.txt"
+    intra_expert_metrics_path = repo_root / "other_data" / "intra_expert_similarity_metrics.csv"
+    inter_expert_metrics_path = repo_root / "other_data" / "inter_expert_metrics.csv"
 
     parser = argparse.ArgumentParser(
         description="Build LaTeX summary tables from classification/regression experiment JSON results."
@@ -1350,6 +1404,66 @@ def main() -> None:
             metric_columns=ACT_TIME_CORR_COLUMNS,
         )
 
+    intra_expert_table_rows = load_comma_table(intra_expert_metrics_path)
+    intra_expert_table_latex: str | None = None
+    if intra_expert_table_rows:
+        intra_expert_columns = [
+            "log",
+            "expert",
+            "intra_centroid_cos",
+            "inter_centroid_cos",
+            "centroid_margin",
+            "knn_purity@5",
+            "knn_purity@10",
+        ]
+        intra_expert_labels = {
+            "log": "Event Log",
+            "expert": "Expert",
+            "intra_centroid_cos": "Intra Centroid Cos",
+            "inter_centroid_cos": "Inter Centroid Cos",
+            "centroid_margin": "Centroid Margin",
+            "knn_purity@5": "kNN Purity@5",
+            "knn_purity@10": "kNN Purity@10",
+        }
+        intra_expert_table_latex = render_csv_table(
+            title="Intra-expert similarity metrics.",
+            label="tab:intra-expert-similarity-metrics",
+            rows=intra_expert_table_rows,
+            column_order=intra_expert_columns,
+            column_labels=intra_expert_labels,
+        )
+
+    inter_expert_table_rows = load_comma_table(inter_expert_metrics_path)
+    inter_expert_table_latex: str | None = None
+    if inter_expert_table_rows:
+        inter_expert_columns = [
+            "log",
+            "expert_a",
+            "expert_b",
+            "classification_mean_cos",
+            "classification_mean_l2",
+            "classification_centroid_cos_mean",
+            "regression_mean_cos",
+            "regression_mean_l2",
+        ]
+        inter_expert_labels = {
+            "log": "Event Log",
+            "expert_a": "Expert A",
+            "expert_b": "Expert B",
+            "classification_mean_cos": "Cls Mean Cos",
+            "classification_mean_l2": "Cls Mean L2",
+            "classification_centroid_cos_mean": "Cls Centroid Cos Mean",
+            "regression_mean_cos": "Reg Mean Cos",
+            "regression_mean_l2": "Reg Mean L2",
+        }
+        inter_expert_table_latex = render_csv_table(
+            title="Inter-expert metrics.",
+            label="tab:inter-expert-metrics",
+            rows=inter_expert_table_rows,
+            column_order=inter_expert_columns,
+            column_labels=inter_expert_labels,
+        )
+
     bucket_rows_by_log = load_bucket_rows(buckets_path)
     classification_bucket_figures: list[str] = []
     regression_mae_bucket_figures: list[str] = []
@@ -1430,6 +1544,14 @@ def main() -> None:
             + classification_corr_table
             + "\n\n"
             + mae_corr_table
+        )
+    if intra_expert_table_latex and inter_expert_table_latex:
+        sections.append(
+            r"\section{Expert Similarity Metrics}"
+            + "\n\n"
+            + intra_expert_table_latex
+            + "\n\n"
+            + inter_expert_table_latex
         )
     body = "\n\n\\clearpage\\newpage\n\n".join(sections)
     tex_content = header + body + "\n\n\\end{document}\n"
