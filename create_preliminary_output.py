@@ -10,6 +10,10 @@ from typing import Any
 
 TARGET_PERCENTAGE_CODES = ["0005", "0010", "0030", "0050", "0100", "0200", "0500", "1000"]
 TARGET_GAP_METHODS = ["tabpfn", "our_fm", "our_fm_knn"]
+GAP_METHOD_LABELS = {
+    "our_fm": "fm",
+    "our_fm_knn": "fm_knn",
+}
 
 
 def strip_xes_suffix(name: str) -> str:
@@ -243,7 +247,7 @@ def render_average_percentage_gap_table(
     lines.append(rf"\begin{{tabular}}{{{col_spec}}}")
     lines.append(r"\hline")
 
-    header_cells = [r"\textbf{Data Fraction}"]
+    header_cells = [r"\textbf{\%}"]
     header_cells.extend([rf"\textbf{{{latex_escape(method)}}}" for method in selected_methods])
     lines.append(" & ".join(header_cells) + r" \\")
     lines.append(r"\hline")
@@ -295,10 +299,11 @@ def render_table(
     lines.append(rf"\begin{{tabular}}{{{col_spec}}}")
     lines.append(r"\hline")
 
-    header_cells = [r"\textbf{Event Log}", r"\textbf{Data Fraction}"]
+    header_cells = [r"\textbf{Event Log}", r"\textbf{\%}"]
     header_cells.extend([rf"\textbf{{{latex_escape(method)}}}" for method in methods])
     for method in gap_methods:
-        header_cells.append(rf"\textbf{{{latex_escape(method)} gap}}")
+        gap_label = GAP_METHOD_LABELS.get(method, method)
+        header_cells.append(rf"\textbf{{{latex_escape(gap_label)} gap}}")
     lines.append(" & ".join(header_cells) + r" \\")
     lines.append(r"\hline")
 
