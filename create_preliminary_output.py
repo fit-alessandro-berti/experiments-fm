@@ -155,6 +155,17 @@ def style_metric(value_text: str, rank: int | None) -> str:
     return value_text
 
 
+def join_for_caption(items: list[str]) -> str:
+    escaped_items = [latex_escape(item) for item in items]
+    if not escaped_items:
+        return ""
+    if len(escaped_items) == 1:
+        return escaped_items[0]
+    if len(escaped_items) == 2:
+        return f"{escaped_items[0]} and {escaped_items[1]}"
+    return ", ".join(escaped_items[:-1]) + f", and {escaped_items[-1]}"
+
+
 def percentage_sort_key(percentage_code: str) -> tuple[int, str]:
     try:
         return int(percentage_code), percentage_code
@@ -373,13 +384,13 @@ def render_table(
 
 
 def render_accuracy_tikz_plot(
-    title: str,
     label: str,
     log_name: str,
     methods: list[str],
     percentages: list[str],
     data: dict[str, dict[str, dict[str, dict[str, Any]]]],
     decimals: int = 2,
+    title: str | None = None,
 ) -> str:
     lines: list[str] = []
     lines.append(r"\begin{figure}[ht]")
@@ -447,7 +458,15 @@ def render_accuracy_tikz_plot(
 
     lines.append(r"\end{axis}")
     lines.append(r"\end{tikzpicture}")
-    lines.append(rf"\caption{{{title}}}")
+    if title is None:
+        method_list = join_for_caption(methods)
+        auto_title = (
+            f"Classification accuracy percentages by data fraction for the {latex_escape(log_name)} event log "
+            f"(methods: {method_list})."
+        )
+    else:
+        auto_title = title
+    lines.append(rf"\caption{{{auto_title}}}")
     lines.append(rf"\label{{{label}}}")
     lines.append(r"\end{figure}")
     return "\n".join(lines)
@@ -556,10 +575,6 @@ def main() -> None:
         averages=classification_gap_averages,
     )
     figure_billing_accuracy = render_accuracy_tikz_plot(
-        title=(
-            "Classification accuracy percentages by data fraction for the billing event log "
-            r"(knn, tabpfn, our\_fm, and our\_fm\_knn)."
-        ),
         label="fig:billing-classification-accuracy-curves",
         log_name="billing",
         methods=["knn", "tabpfn", "our_fm", "our_fm_knn"],
