@@ -1,0 +1,6 @@
+log;Distance correlation(activity_block, time_block);MI(activity_indicators, time_features) mean;MI(activity_indicators, time_features) prevalence-weighted mean;
+billing;0.586239;0.037168;0.249256;
+helpdesk;0.611634;0.027671;0.149921;
+receipt;0.256668;0.015195;0.099045;
+roadtraffic_10000;0.759377;0.075263;0.383916;
+sepsis;0.560200;0.044452;0.115356;
