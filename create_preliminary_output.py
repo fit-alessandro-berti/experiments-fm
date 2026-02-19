@@ -115,6 +115,16 @@ def format_metric(value: float | None, decimals: int) -> str:
     return f"{value:.{decimals}f}"
 
 
+def format_percentage(percentage_code: str) -> str:
+    try:
+        percentage_value = int(percentage_code) / 10.0
+    except ValueError:
+        return latex_escape(percentage_code)
+    if percentage_value.is_integer():
+        return f"{int(percentage_value)}\\%"
+    return f"{percentage_value:.1f}\\%"
+
+
 def style_metric(value_text: str, rank: int | None) -> str:
     if rank == 0:
         return rf"\textcolor{{green}}{{\textbf{{{value_text}}}}}"
@@ -123,17 +133,6 @@ def style_metric(value_text: str, rank: int | None) -> str:
     if rank == 2:
         return rf"\textcolor{{orange}}{{{value_text}}}"
     return value_text
-
-
-def compute_row_avg_stdev(values: list[float | None]) -> tuple[float | None, float | None]:
-    present_values = [value for value in values if value is not None]
-    if not present_values:
-        return None, None
-    avg = sum(present_values) / len(present_values)
-    if len(present_values) == 1:
-        return avg, 0.0
-    variance = sum((value - avg) ** 2 for value in present_values) / len(present_values)
-    return avg, math.sqrt(variance)
 
 
 def render_table(
@@ -153,9 +152,7 @@ def render_table(
         r"\textcolor{violet}{\textit{violet}} = second best, "
         r"\textcolor{orange}{orange} = third best."
     )
-    base_column_count = len(logs) * len(percentages)
-    column_count = base_column_count + 2
-    col_spec = "l" + ("c" * base_column_count) + "|cc"
+    col_spec = "ll" + ("c" * len(methods))
     lines: list[str] = []
     lines.append(r"\begin{table}[ht]")
     lines.append(r"\centering")
@@ -166,59 +163,46 @@ def render_table(
     lines.append(rf"\begin{{tabular}}{{{col_spec}}}")
     lines.append(r"\hline")
 
-    first_header_cells = [r"\textbf{Method}"]
-    for log_name in logs:
-        first_header_cells.append(
-            rf"\multicolumn{{{len(percentages)}}}{{c}}{{\textbf{{{latex_escape(log_name)}}}}}"
-        )
-    first_header_cells.append(r"\multicolumn{2}{c}{\textbf{Summary}}")
-    lines.append(" & ".join(first_header_cells) + r" \\")
-
-    second_header_cells = [""]
-    for _log_name in logs:
-        second_header_cells.extend([latex_escape(percentage) for percentage in percentages])
-    second_header_cells.extend([r"\textbf{Avg}", r"\textbf{Stdev}"])
-    lines.append(" & ".join(second_header_cells) + r" \\")
+    header_cells = [r"\textbf{Event Log}", r"\textbf{Data Fraction}"]
+    header_cells.extend([rf"\textbf{{{latex_escape(method)}}}" for method in methods])
+    lines.append(" & ".join(header_cells) + r" \\")
     lines.append(r"\hline")
 
-    values_by_method: list[list[float | None]] = []
-    for method in methods:
-        row_values: list[float | None] = []
-        for log_name in logs:
-            for percentage in percentages:
+    for log_name in logs:
+        for percentage_idx, percentage in enumerate(percentages):
+            row_values: list[float | None] = []
+            for method in methods:
                 payload = data.get(method, {}).get(log_name, {}).get(percentage)
                 value = get_numeric_metric(payload, metric_keys)
                 if value is not None and transform is not None:
                     value = transform(value)
                 row_values.append(value)
-        avg, stdev = compute_row_avg_stdev(row_values)
-        row_values.extend([avg, stdev])
-        values_by_method.append(row_values)
 
-    higher_is_better_by_column = ([higher_is_better] * base_column_count) + [higher_is_better, False]
-    ranks_by_value_per_column: list[dict[float, int]] = []
-    for column_idx in range(column_count):
-        present_values = [
-            method_values[column_idx]
-            for method_values in values_by_method
-            if method_values[column_idx] is not None
-        ]
-        unique_values = sorted(set(present_values), reverse=higher_is_better_by_column[column_idx])
-        top_values = unique_values[:3]
-        ranks_by_value_per_column.append({value: rank for rank, value in enumerate(top_values)})
+            present_values = [value for value in row_values if value is not None]
+            unique_values = sorted(set(present_values), reverse=higher_is_better)
+            top_values = unique_values[:3]
+            row_ranks = {value: rank for rank, value in enumerate(top_values)}
 
-    for method_idx, method in enumerate(methods):
-        row_cells = [latex_escape(method)]
-        for column_idx, value in enumerate(values_by_method[method_idx]):
-            value_text = format_metric(value, decimals)
-            if value is None:
-                row_cells.append(value_text)
-                continue
-            rank = ranks_by_value_per_column[column_idx].get(value)
-            row_cells.append(style_metric(value_text, rank))
-        lines.append(" & ".join(row_cells) + r" \\")
+            row_cells: list[str] = []
+            if percentage_idx == 0:
+                row_cells.append(
+                    rf"\multirow{{{len(percentages)}}}{{*}}{{\textbf{{{latex_escape(log_name)}}}}}"
+                )
+            else:
+                row_cells.append("")
+            row_cells.append(format_percentage(percentage))
 
-    lines.append(r"\hline")
+            for value in row_values:
+                value_text = format_metric(value, decimals)
+                if value is None:
+                    row_cells.append(value_text)
+                    continue
+                row_cells.append(style_metric(value_text, row_ranks.get(value)))
+
+            lines.append(" & ".join(row_cells) + r" \\")
+
+        lines.append(r"\hline")
+
     lines.append(r"\end{tabular}")
     lines.append(r"}")
     lines.append(r"\end{table}")
@@ -250,8 +234,8 @@ def main() -> None:
     parser.add_argument(
         "--percentages",
         nargs="+",
-        default=["0050", "0200", "1000"],
-        help="Percentage-folder codes to include as columns.",
+        default=["0005", "0010", "0030", "0050", "0100", "0200", "0500", "1000"],
+        help="Percentage-folder codes to include as rows.",
     )
     parser.add_argument(
         "--logs",
@@ -312,6 +296,7 @@ def main() -> None:
             r"\documentclass{article}",
             r"\usepackage{graphicx} % Required for inserting images",
             r"\usepackage{xcolor}",
+            r"\usepackage{multirow}",
             "",
             r"\title{Trial123}",
             r"\author{a.berti }",
@@ -326,7 +311,7 @@ def main() -> None:
         ]
     )
 
-    body = "\n\n".join([table_accuracy, table_mae, table_r2])
+    body = "\n\n\\clearpage\\newpage\n\n".join([table_accuracy, table_mae, table_r2])
     tex_content = header + body + "\n\n\\end{document}\n"
     output_path.write_text(tex_content, encoding="utf-8")
     print(f"Wrote {output_path}")
