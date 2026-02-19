@@ -21,6 +21,10 @@ PLOT_METHOD_COLORS = {
     "our_fm_knn": "orange",
 }
 THICK_LINE_METHODS = {"our_fm", "our_fm_knn"}
+DISTANCE_CORR_COLUMN = "Distance correlation(activity_block, time_block)"
+MI_MEAN_COLUMN = "MI(activity_indicators, time_features) mean"
+MI_PREV_WEIGHTED_COLUMN = "MI(activity_indicators, time_features) prevalence-weighted mean"
+ACT_TIME_CORR_COLUMNS = [DISTANCE_CORR_COLUMN, MI_MEAN_COLUMN, MI_PREV_WEIGHTED_COLUMN]
 
 
 def strip_xes_suffix(name: str) -> str:
@@ -116,6 +120,48 @@ def load_bucket_rows(path: Path) -> dict[str, list[dict[str, str]]]:
         buckets_by_log[log_name] = rows
 
     return buckets_by_log
+
+
+def load_semicolon_table(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+
+    lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if not lines:
+        return []
+
+    header = lines[0].split(";")
+    if header and header[-1] == "":
+        header = header[:-1]
+
+    rows: list[dict[str, str]] = []
+    for line in lines[1:]:
+        fields = line.split(";")
+        if fields and fields[-1] == "":
+            fields = fields[:-1]
+        if len(fields) < len(header):
+            fields = fields + [""] * (len(header) - len(fields))
+        rows.append({key: fields[idx] for idx, key in enumerate(header)})
+
+    return rows
+
+
+def load_act_time_corr_metrics(path: Path) -> dict[str, dict[str, float]]:
+    rows = load_semicolon_table(path)
+    metrics_by_log: dict[str, dict[str, float]] = {}
+    for row in rows:
+        log_name = row.get("log", "").strip()
+        if not log_name:
+            continue
+
+        parsed_row: dict[str, float] = {}
+        for column in ACT_TIME_CORR_COLUMNS:
+            value = parse_numeric(row.get(column))
+            if value is not None:
+                parsed_row[column] = value
+        metrics_by_log[log_name] = parsed_row
+
+    return metrics_by_log
 
 
 def discover_logs(base_logs_dir: Path) -> list[str]:
@@ -318,6 +364,93 @@ def compute_average_percentage_gap(
     return averages
 
 
+def compute_average_percentage_gap_by_log(
+    methods: list[str],
+    logs: list[str],
+    percentages: list[str],
+    data: dict[str, dict[str, dict[str, dict[str, Any]]]],
+    metric_keys: list[str],
+    selected_methods: list[str],
+    transform: Callable[[float], float] | None = None,
+    higher_is_better: bool = True,
+) -> dict[str, float | None]:
+    averages_by_log: dict[str, float | None] = {}
+
+    for log_name in logs:
+        differences: list[float] = []
+        for percentage in percentages:
+            row_values: dict[str, float] = {}
+            for method in methods:
+                payload = data.get(method, {}).get(log_name, {}).get(percentage)
+                value = get_numeric_metric(payload, metric_keys)
+                if value is not None and transform is not None:
+                    value = transform(value)
+                if value is not None:
+                    row_values[method] = value
+
+            if not row_values:
+                continue
+
+            best_value = max(row_values.values()) if higher_is_better else min(row_values.values())
+            for method in selected_methods:
+                model_value = row_values.get(method)
+                difference = compute_gap_to_best(
+                    model_value=model_value,
+                    best_value=best_value,
+                    higher_is_better=higher_is_better,
+                )
+                if difference is not None:
+                    differences.append(difference)
+
+        averages_by_log[log_name] = (sum(differences) / len(differences)) if differences else None
+
+    return averages_by_log
+
+
+def pearson_correlation(x_values: list[float], y_values: list[float]) -> float | None:
+    if len(x_values) != len(y_values) or len(x_values) < 2:
+        return None
+
+    mean_x = sum(x_values) / len(x_values)
+    mean_y = sum(y_values) / len(y_values)
+
+    centered_x = [value - mean_x for value in x_values]
+    centered_y = [value - mean_y for value in y_values]
+
+    variance_x = sum(value * value for value in centered_x)
+    variance_y = sum(value * value for value in centered_y)
+    denominator = math.sqrt(variance_x * variance_y)
+    if denominator <= 1e-12:
+        return None
+
+    covariance = sum(x_val * y_val for x_val, y_val in zip(centered_x, centered_y))
+    return covariance / denominator
+
+
+def compute_metric_gap_correlations(
+    metrics_by_log: dict[str, dict[str, float]],
+    gap_by_log: dict[str, float | None],
+    metric_columns: list[str],
+) -> dict[str, tuple[float | None, int]]:
+    results: dict[str, tuple[float | None, int]] = {}
+
+    for metric_name in metric_columns:
+        x_values: list[float] = []
+        y_values: list[float] = []
+        for log_name, metric_values in metrics_by_log.items():
+            metric_value = metric_values.get(metric_name)
+            gap_value = gap_by_log.get(log_name)
+            if metric_value is None or gap_value is None:
+                continue
+            x_values.append(metric_value)
+            y_values.append(gap_value)
+
+        correlation = pearson_correlation(x_values, y_values)
+        results[metric_name] = (correlation, len(x_values))
+
+    return results
+
+
 def render_average_percentage_gap_table(
     title: str,
     label: str,
@@ -348,6 +481,39 @@ def render_average_percentage_gap_table(
             value = averages.get(percentage, {}).get(method)
             row_cells.append("" if value is None else f"{value:.{decimals}f}\\%")
         lines.append(" & ".join(row_cells) + r" \\")
+
+    lines.append(r"\hline")
+    lines.append(r"\end{tabular}")
+    lines.append(r"}")
+    lines.append(r"\end{table}")
+    return "\n".join(lines)
+
+
+def render_metric_gap_correlation_table(
+    title: str,
+    label: str,
+    correlations: dict[str, tuple[float | None, int]],
+    metric_columns: list[str],
+    decimals: int = 3,
+) -> str:
+    lines: list[str] = []
+    lines.append(r"\begin{table}[ht]")
+    lines.append(r"\centering")
+    lines.append(r"\small")
+    lines.append(rf"\caption{{{title}}}")
+    lines.append(rf"\label{{{label}}}")
+    lines.append(r"\resizebox{0.85\textwidth}{!}{%")
+    lines.append(r"\begin{tabular}{p{0.60\textwidth}cc}")
+    lines.append(r"\hline")
+    lines.append(r"\textbf{Metric} & \textbf{Pearson $r$} & \textbf{Logs used} \\")
+    lines.append(r"\hline")
+
+    for metric_name in metric_columns:
+        correlation, sample_size = correlations.get(metric_name, (None, 0))
+        corr_text = "" if correlation is None else f"{correlation:.{decimals}f}"
+        lines.append(
+            rf"{latex_escape(metric_name)} & {corr_text} & {sample_size} \\"
+        )
 
     lines.append(r"\hline")
     lines.append(r"\end{tabular}")
@@ -970,6 +1136,7 @@ def main() -> None:
     repo_root = Path(__file__).resolve().parent
     output_path = repo_root / "preliminary_output.tex"
     buckets_path = repo_root / "other_data" / "buckets.txt"
+    act_time_corr_path = repo_root / "other_data" / "act_time_corr_metrics.txt"
 
     parser = argparse.ArgumentParser(
         description="Build LaTeX summary tables from classification/regression experiment JSON results."
@@ -1127,6 +1294,62 @@ def main() -> None:
         percentages=table_percentages,
         data=reg_data,
     )
+
+    act_time_metrics_by_log = load_act_time_corr_metrics(act_time_corr_path)
+    metric_logs = sorted(act_time_metrics_by_log.keys())
+    classification_corr_table: str | None = None
+    mae_corr_table: str | None = None
+    if metric_logs:
+        classification_gap_by_log = compute_average_percentage_gap_by_log(
+            methods=classification_methods,
+            logs=metric_logs,
+            percentages=gap_percentages,
+            data=cls_data,
+            metric_keys=["accuracy"],
+            selected_methods=TARGET_GAP_METHODS,
+            higher_is_better=True,
+        )
+        mae_gap_by_log = compute_average_percentage_gap_by_log(
+            methods=regression_methods,
+            logs=metric_logs,
+            percentages=gap_percentages,
+            data=reg_data,
+            metric_keys=["mae", "mae_seconds"],
+            selected_methods=TARGET_GAP_METHODS,
+            transform=lambda value: value / 3600.0,
+            higher_is_better=False,
+        )
+
+        classification_metric_correlations = compute_metric_gap_correlations(
+            metrics_by_log=act_time_metrics_by_log,
+            gap_by_log=classification_gap_by_log,
+            metric_columns=ACT_TIME_CORR_COLUMNS,
+        )
+        mae_metric_correlations = compute_metric_gap_correlations(
+            metrics_by_log=act_time_metrics_by_log,
+            gap_by_log=mae_gap_by_log,
+            metric_columns=ACT_TIME_CORR_COLUMNS,
+        )
+
+        classification_corr_table = render_metric_gap_correlation_table(
+            title=(
+                "Pearson correlation between activity-time metrics and event-log average "
+                "classification gap to best (lower is better)."
+            ),
+            label="tab:activity-time-vs-classification-gap-correlation",
+            correlations=classification_metric_correlations,
+            metric_columns=ACT_TIME_CORR_COLUMNS,
+        )
+        mae_corr_table = render_metric_gap_correlation_table(
+            title=(
+                "Pearson correlation between activity-time metrics and event-log average "
+                "MAE gap to best (lower is better)."
+            ),
+            label="tab:activity-time-vs-mae-gap-correlation",
+            correlations=mae_metric_correlations,
+            metric_columns=ACT_TIME_CORR_COLUMNS,
+        )
+
     bucket_rows_by_log = load_bucket_rows(buckets_path)
     classification_bucket_figures: list[str] = []
     regression_mae_bucket_figures: list[str] = []
@@ -1199,6 +1422,14 @@ def main() -> None:
             r"\section{Regression MAE Confidence Buckets}"
             + "\n\n"
             + "\n\n".join(regression_mae_bucket_figures)
+        )
+    if classification_corr_table and mae_corr_table:
+        sections.append(
+            r"\section{Activity-Time Correlation Analysis}"
+            + "\n\n"
+            + classification_corr_table
+            + "\n\n"
+            + mae_corr_table
         )
     body = "\n\n\\clearpage\\newpage\n\n".join(sections)
     tex_content = header + body + "\n\n\\end{document}\n"
