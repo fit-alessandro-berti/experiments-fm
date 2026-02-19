@@ -8,6 +8,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+TARGET_PERCENTAGE_CODES = ["0005", "0010", "0030", "0050", "0100", "0200", "0500", "1000"]
+TARGET_GAP_METHODS = ["tabpfn", "our_fm", "our_fm_knn"]
+
 
 def strip_xes_suffix(name: str) -> str:
     if name.endswith(".xes.gz"):
@@ -135,6 +138,130 @@ def style_metric(value_text: str, rank: int | None) -> str:
     return value_text
 
 
+def percentage_sort_key(percentage_code: str) -> tuple[int, str]:
+    try:
+        return int(percentage_code), percentage_code
+    except ValueError:
+        return 10**9, percentage_code
+
+
+def ensure_required_percentages(percentages: list[str], required_codes: list[str]) -> list[str]:
+    merged = set(percentages)
+    merged.update(required_codes)
+    return sorted(merged, key=percentage_sort_key)
+
+
+def compute_gap_to_best(
+    model_value: float | None,
+    best_value: float | None,
+    higher_is_better: bool,
+) -> float | None:
+    if model_value is None or best_value is None:
+        return None
+
+    denominator = abs(best_value)
+    if denominator <= 1e-12:
+        return 0.0 if abs(model_value - best_value) <= 1e-12 else None
+
+    if higher_is_better:
+        difference = ((best_value - model_value) / denominator) * 100.0
+    else:
+        difference = ((model_value - best_value) / denominator) * 100.0
+
+    if difference < 0 and difference > -1e-9:
+        return 0.0
+    return difference
+
+
+def compute_average_percentage_gap(
+    methods: list[str],
+    logs: list[str],
+    percentages: list[str],
+    data: dict[str, dict[str, dict[str, dict[str, Any]]]],
+    metric_keys: list[str],
+    selected_methods: list[str],
+    transform: Callable[[float], float] | None = None,
+    higher_is_better: bool = True,
+) -> dict[str, dict[str, float | None]]:
+    averages: dict[str, dict[str, float | None]] = {}
+
+    for percentage in percentages:
+        method_to_differences: dict[str, list[float]] = {method: [] for method in selected_methods}
+        for log_name in logs:
+            row_values: dict[str, float] = {}
+            for method in methods:
+                payload = data.get(method, {}).get(log_name, {}).get(percentage)
+                value = get_numeric_metric(payload, metric_keys)
+                if value is not None and transform is not None:
+                    value = transform(value)
+                if value is not None:
+                    row_values[method] = value
+
+            if not row_values:
+                continue
+
+            best_value = max(row_values.values()) if higher_is_better else min(row_values.values())
+            for method in selected_methods:
+                model_value = row_values.get(method)
+                difference = compute_gap_to_best(
+                    model_value=model_value,
+                    best_value=best_value,
+                    higher_is_better=higher_is_better,
+                )
+                if difference is None:
+                    continue
+                method_to_differences[method].append(difference)
+
+        averages[percentage] = {
+            method: (
+                sum(values) / len(values)
+                if values
+                else None
+            )
+            for method, values in method_to_differences.items()
+        }
+
+    return averages
+
+
+def render_average_percentage_gap_table(
+    title: str,
+    label: str,
+    percentages: list[str],
+    selected_methods: list[str],
+    averages: dict[str, dict[str, float | None]],
+    decimals: int = 2,
+) -> str:
+    col_spec = "l" + ("c" * len(selected_methods))
+    lines: list[str] = []
+    lines.append(r"\begin{table}[ht]")
+    lines.append(r"\centering")
+    lines.append(r"\small")
+    lines.append(rf"\caption{{{title}}}")
+    lines.append(rf"\label{{{label}}}")
+    lines.append(r"\resizebox{0.75\textwidth}{!}{%")
+    lines.append(rf"\begin{{tabular}}{{{col_spec}}}")
+    lines.append(r"\hline")
+
+    header_cells = [r"\textbf{Data Fraction}"]
+    header_cells.extend([rf"\textbf{{{latex_escape(method)}}}" for method in selected_methods])
+    lines.append(" & ".join(header_cells) + r" \\")
+    lines.append(r"\hline")
+
+    for percentage in percentages:
+        row_cells = [format_percentage(percentage)]
+        for method in selected_methods:
+            value = averages.get(percentage, {}).get(method)
+            row_cells.append("" if value is None else f"{value:.{decimals}f}\\%")
+        lines.append(" & ".join(row_cells) + r" \\")
+
+    lines.append(r"\hline")
+    lines.append(r"\end{tabular}")
+    lines.append(r"}")
+    lines.append(r"\end{table}")
+    return "\n".join(lines)
+
+
 def render_table(
     title: str,
     label: str,
@@ -146,42 +273,52 @@ def render_table(
     decimals: int,
     transform: Callable[[float], float] | None = None,
     higher_is_better: bool = True,
+    gap_methods: list[str] | None = None,
+    gap_decimals: int = 2,
 ) -> str:
     color_legend = (
         r"\textcolor{green}{\textbf{green}} = best, "
         r"\textcolor{violet}{\textit{violet}} = second best, "
         r"\textcolor{orange}{orange} = third best."
     )
+    gap_methods = gap_methods or []
     col_spec = "ll" + ("c" * len(methods))
+    if gap_methods:
+        col_spec += "|" + ("c" * len(gap_methods)) + "|"
     lines: list[str] = []
     lines.append(r"\begin{table}[ht]")
     lines.append(r"\centering")
     lines.append(r"\small")
     lines.append(rf"\caption{{{title} {color_legend}}}")
     lines.append(rf"\label{{{label}}}")
-    lines.append(r"\resizebox{\textwidth}{!}{%")
+    lines.append(r"\resizebox{0.75\textwidth}{!}{%")
     lines.append(rf"\begin{{tabular}}{{{col_spec}}}")
     lines.append(r"\hline")
 
     header_cells = [r"\textbf{Event Log}", r"\textbf{Data Fraction}"]
     header_cells.extend([rf"\textbf{{{latex_escape(method)}}}" for method in methods])
+    for method in gap_methods:
+        header_cells.append(rf"\textbf{{{latex_escape(method)} gap}}")
     lines.append(" & ".join(header_cells) + r" \\")
     lines.append(r"\hline")
 
     for log_name in logs:
         for percentage_idx, percentage in enumerate(percentages):
+            value_by_method: dict[str, float | None] = {}
             row_values: list[float | None] = []
             for method in methods:
                 payload = data.get(method, {}).get(log_name, {}).get(percentage)
                 value = get_numeric_metric(payload, metric_keys)
                 if value is not None and transform is not None:
                     value = transform(value)
+                value_by_method[method] = value
                 row_values.append(value)
 
             present_values = [value for value in row_values if value is not None]
             unique_values = sorted(set(present_values), reverse=higher_is_better)
             top_values = unique_values[:3]
             row_ranks = {value: rank for rank, value in enumerate(top_values)}
+            best_value = unique_values[0] if unique_values else None
 
             row_cells: list[str] = []
             if percentage_idx == 0:
@@ -198,6 +335,14 @@ def render_table(
                     row_cells.append(value_text)
                     continue
                 row_cells.append(style_metric(value_text, row_ranks.get(value)))
+
+            for method in gap_methods:
+                gap_value = compute_gap_to_best(
+                    model_value=value_by_method.get(method),
+                    best_value=best_value,
+                    higher_is_better=higher_is_better,
+                )
+                row_cells.append("" if gap_value is None else f"{gap_value:.{gap_decimals}f}\\%")
 
             lines.append(" & ".join(row_cells) + r" \\")
 
@@ -245,6 +390,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    table_percentages = ensure_required_percentages(args.percentages, required_codes=["0100"])
     discovered_logs = discover_logs(args.base_logs_dir)
     logs = args.logs if args.logs else discovered_logs
     if not logs:
@@ -261,10 +407,11 @@ def main() -> None:
         label="tab:classification-accuracy",
         methods=classification_methods,
         logs=logs,
-        percentages=args.percentages,
+        percentages=table_percentages,
         data=cls_data,
         metric_keys=["accuracy"],
         decimals=3,
+        gap_methods=["our_fm", "our_fm_knn"],
     )
 
     table_mae = render_table(
@@ -272,12 +419,13 @@ def main() -> None:
         label="tab:regression-mae",
         methods=regression_methods,
         logs=logs,
-        percentages=args.percentages,
+        percentages=table_percentages,
         data=reg_data,
         metric_keys=["mae", "mae_seconds"],
         decimals=2,
         transform=lambda value: value / 3600.0,
         higher_is_better=False,
+        gap_methods=["our_fm", "our_fm_knn"],
     )
 
     table_r2 = render_table(
@@ -285,10 +433,46 @@ def main() -> None:
         label="tab:regression-r2",
         methods=regression_methods,
         logs=logs,
-        percentages=args.percentages,
+        percentages=table_percentages,
         data=reg_data,
         metric_keys=["r2"],
         decimals=3,
+    )
+
+    gap_percentages = TARGET_PERCENTAGE_CODES
+    classification_gap_averages = compute_average_percentage_gap(
+        methods=classification_methods,
+        logs=logs,
+        percentages=gap_percentages,
+        data=cls_data,
+        metric_keys=["accuracy"],
+        selected_methods=TARGET_GAP_METHODS,
+        higher_is_better=True,
+    )
+    table_accuracy_gap = render_average_percentage_gap_table(
+        title="Average percentage gap to the best classification model (lower is better).",
+        label="tab:classification-gap-to-best",
+        percentages=gap_percentages,
+        selected_methods=TARGET_GAP_METHODS,
+        averages=classification_gap_averages,
+    )
+
+    mae_gap_averages = compute_average_percentage_gap(
+        methods=regression_methods,
+        logs=logs,
+        percentages=gap_percentages,
+        data=reg_data,
+        metric_keys=["mae", "mae_seconds"],
+        selected_methods=TARGET_GAP_METHODS,
+        transform=lambda value: value / 3600.0,
+        higher_is_better=False,
+    )
+    table_mae_gap = render_average_percentage_gap_table(
+        title="Average percentage gap to the best MAE model (lower is better).",
+        label="tab:mae-gap-to-best",
+        percentages=gap_percentages,
+        selected_methods=TARGET_GAP_METHODS,
+        averages=mae_gap_averages,
     )
 
     header = "\n".join(
@@ -311,7 +495,12 @@ def main() -> None:
         ]
     )
 
-    body = "\n\n\\clearpage\\newpage\n\n".join([table_accuracy, table_mae, table_r2])
+    sections = [
+        table_accuracy + "\n\n" + table_accuracy_gap,
+        table_mae + "\n\n" + table_mae_gap,
+        table_r2,
+    ]
+    body = "\n\n\\clearpage\\newpage\n\n".join(sections)
     tex_content = header + body + "\n\n\\end{document}\n"
     output_path.write_text(tex_content, encoding="utf-8")
     print(f"Wrote {output_path}")
