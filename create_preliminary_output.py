@@ -375,6 +375,33 @@ def render_average_percentage_gap_tikz_plot(
     return "\n".join(lines)
 
 
+def render_regression_mae_gap_tikz_plot(
+    label: str,
+    percentages: list[str],
+    selected_methods: list[str],
+    averages: dict[str, dict[str, float | None]],
+    decimals: int = 2,
+    title: str | None = None,
+) -> str:
+    if title is None:
+        method_list = join_for_caption(selected_methods)
+        auto_title = (
+            "Average percentage gap to the best MAE model by data fraction "
+            f"(methods: {method_list}; lower is better)."
+        )
+    else:
+        auto_title = title
+
+    return render_average_percentage_gap_tikz_plot(
+        label=label,
+        percentages=percentages,
+        selected_methods=selected_methods,
+        averages=averages,
+        decimals=decimals,
+        title=auto_title,
+    )
+
+
 def render_table(
     title: str,
     label: str,
@@ -790,6 +817,12 @@ def main() -> None:
         selected_methods=TARGET_GAP_METHODS,
         averages=mae_gap_averages,
     )
+    figure_mae_gap = render_regression_mae_gap_tikz_plot(
+        label="fig:mae-average-gap-to-best-curves",
+        percentages=gap_percentages,
+        selected_methods=["knn", "tabpfn", "our_fm", "our_fm_knn"],
+        averages=mae_gap_averages,
+    )
     figure_billing_mae = render_regression_mae_tikz_plot(
         label="fig:billing-regression-mae-curves",
         log_name="billing",
@@ -841,6 +874,8 @@ def main() -> None:
         table_mae
         + "\n\n"
         + table_mae_gap
+        + "\n\n"
+        + figure_mae_gap
         + "\n\n"
         + figure_billing_mae
         + "\n\n"
