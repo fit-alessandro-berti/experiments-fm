@@ -9,10 +9,16 @@ from pathlib import Path
 from typing import Any
 
 TARGET_PERCENTAGE_CODES = ["0005", "0010", "0030", "0050", "0100", "0200", "0500", "1000"]
-TARGET_GAP_METHODS = ["tabpfn", "our_fm", "our_fm_knn"]
+TARGET_GAP_METHODS = ["tabpfn", "knn", "our_fm", "our_fm_knn"]
 GAP_METHOD_LABELS = {
     "our_fm": "fm",
     "our_fm_knn": "fm_knn",
+}
+PLOT_METHOD_COLORS = {
+    "knn": "teal",
+    "tabpfn": "blue",
+    "our_fm": "red",
+    "our_fm_knn": "orange",
 }
 
 
@@ -132,6 +138,13 @@ def format_percentage(percentage_code: str) -> str:
     return f"{percentage_value:.1f}\\%"
 
 
+def percentage_code_to_fraction(percentage_code: str) -> float | None:
+    try:
+        return int(percentage_code) / 10.0
+    except ValueError:
+        return None
+
+
 def style_metric(value_text: str, rank: int | None) -> str:
     if rank == 0:
         return rf"\textcolor{{green}}{{\textbf{{{value_text}}}}}"
@@ -243,7 +256,7 @@ def render_average_percentage_gap_table(
     lines.append(r"\small")
     lines.append(rf"\caption{{{title}}}")
     lines.append(rf"\label{{{label}}}")
-    lines.append(r"\resizebox{0.75\textwidth}{!}{%")
+    lines.append(r"\resizebox{0.5\textwidth}{!}{%")
     lines.append(rf"\begin{{tabular}}{{{col_spec}}}")
     lines.append(r"\hline")
 
@@ -359,6 +372,87 @@ def render_table(
     return "\n".join(lines)
 
 
+def render_accuracy_tikz_plot(
+    title: str,
+    label: str,
+    log_name: str,
+    methods: list[str],
+    percentages: list[str],
+    data: dict[str, dict[str, dict[str, dict[str, Any]]]],
+    decimals: int = 2,
+) -> str:
+    lines: list[str] = []
+    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\centering")
+    lines.append(r"\begin{tikzpicture}")
+
+    tick_label_by_position: dict[float, str] = {}
+    for percentage in percentages:
+        fraction = percentage_code_to_fraction(percentage)
+        if fraction is not None:
+            tick_label_by_position[math.log1p(fraction)] = f"{fraction:g}"
+
+    unique_xtick_positions = sorted(tick_label_by_position.keys())
+    xtick_text = ",".join(f"{tick:.6f}" for tick in unique_xtick_positions)
+    xtick_labels_text = ",".join(tick_label_by_position[tick] for tick in unique_xtick_positions)
+
+    method_to_coordinates: dict[str, list[str]] = {}
+    min_accuracy: float | None = None
+    for method in methods:
+        coordinates: list[str] = []
+        for percentage in percentages:
+            fraction = percentage_code_to_fraction(percentage)
+            if fraction is None:
+                continue
+            payload = data.get(method, {}).get(log_name, {}).get(percentage)
+            accuracy = get_numeric_metric(payload, ["accuracy"])
+            if accuracy is None:
+                continue
+            x_value = math.log1p(fraction)
+            y_value = accuracy * 100.0
+            min_accuracy = y_value if min_accuracy is None else min(min_accuracy, y_value)
+            coordinates.append(f"({x_value:.6f},{y_value:.{decimals}f})")
+        method_to_coordinates[method] = coordinates
+
+    axis_options = [
+        r"width=0.8\textwidth",
+        r"height=0.45\textwidth",
+        r"xlabel={log(1 + Data Fraction (\%))}",
+        r"ylabel={Accuracy (\%)}",
+        r"grid=major",
+        r"legend style={at={(0.5,-0.22)}, anchor=north}",
+        r"legend columns=2",
+        f"ymin={(min_accuracy if min_accuracy is not None else 0.0):.{decimals}f}",
+        r"ymax=100",
+    ]
+    if xtick_text:
+        axis_options.append(rf"xtick={{{xtick_text}}}")
+    if xtick_labels_text:
+        axis_options.append(rf"xticklabels={{{xtick_labels_text}}}")
+
+    lines.append(r"\begin{axis}[")
+    lines.append(",\n".join(axis_options))
+    lines.append(r"]")
+
+    for method in methods:
+        coordinates = method_to_coordinates.get(method, [])
+        if not coordinates:
+            continue
+
+        color = PLOT_METHOD_COLORS.get(method, "black")
+        lines.append(
+            rf"\addplot+[smooth, thick, color={color}, mark=*] coordinates {{ {' '.join(coordinates)} }};"
+        )
+        lines.append(rf"\addlegendentry{{{latex_escape(method)}}}")
+
+    lines.append(r"\end{axis}")
+    lines.append(r"\end{tikzpicture}")
+    lines.append(rf"\caption{{{title}}}")
+    lines.append(rf"\label{{{label}}}")
+    lines.append(r"\end{figure}")
+    return "\n".join(lines)
+
+
 def main() -> None:
     repo_root = Path(__file__).resolve().parent
     output_path = repo_root / "preliminary_output.tex"
@@ -461,6 +555,17 @@ def main() -> None:
         selected_methods=TARGET_GAP_METHODS,
         averages=classification_gap_averages,
     )
+    figure_billing_accuracy = render_accuracy_tikz_plot(
+        title=(
+            "Classification accuracy percentages by data fraction for the billing event log "
+            r"(knn, tabpfn, our\_fm, and our\_fm\_knn)."
+        ),
+        label="fig:billing-classification-accuracy-curves",
+        log_name="billing",
+        methods=["knn", "tabpfn", "our_fm", "our_fm_knn"],
+        percentages=table_percentages,
+        data=cls_data,
+    )
 
     mae_gap_averages = compute_average_percentage_gap(
         methods=regression_methods,
@@ -486,6 +591,9 @@ def main() -> None:
             r"\usepackage{graphicx} % Required for inserting images",
             r"\usepackage{xcolor}",
             r"\usepackage{multirow}",
+            r"\usepackage{tikz}",
+            r"\usepackage{pgfplots}",
+            r"\pgfplotsset{compat=1.18}",
             "",
             r"\title{Trial123}",
             r"\author{a.berti }",
@@ -501,7 +609,7 @@ def main() -> None:
     )
 
     sections = [
-        table_accuracy + "\n\n" + table_accuracy_gap,
+        table_accuracy + "\n\n" + table_accuracy_gap + "\n\n" + figure_billing_accuracy,
         table_mae + "\n\n" + table_mae_gap,
         table_r2,
     ]
