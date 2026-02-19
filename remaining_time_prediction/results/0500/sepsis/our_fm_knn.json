@@ -1,0 +1,8 @@
+{
+  "method": "our_fm_knn",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0500\\sepsis.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\sepsis.xes.gz",
+  "mae": 2616092.28,
+  "r2": -0.0360,
+  "status": "ok"
+}

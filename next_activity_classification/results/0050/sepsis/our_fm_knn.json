@@ -1,0 +1,7 @@
+{
+  "method": "our_fm_knn",
+  "train_log": "C:\\Users\\berti\\experiments-fm\\logs\\training\\0050\\sepsis.xes.gz",
+  "test_log": "C:\\Users\\berti\\experiments-fm\\logs\\test\\sepsis.xes.gz",
+  "accuracy": 0.63,
+  "status": "ok"
+}
