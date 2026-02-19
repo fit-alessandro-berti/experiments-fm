@@ -472,6 +472,99 @@ def render_accuracy_tikz_plot(
     return "\n".join(lines)
 
 
+def render_regression_mae_tikz_plot(
+    label: str,
+    log_name: str,
+    methods: list[str],
+    percentages: list[str],
+    data: dict[str, dict[str, dict[str, dict[str, Any]]]],
+    decimals: int = 2,
+    title: str | None = None,
+    metric_keys: list[str] | None = None,
+    transform: Callable[[float], float] | None = None,
+) -> str:
+    lines: list[str] = []
+    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\centering")
+    lines.append(r"\begin{tikzpicture}")
+
+    tick_label_by_position: dict[float, str] = {}
+    for percentage in percentages:
+        fraction = percentage_code_to_fraction(percentage)
+        if fraction is not None:
+            tick_label_by_position[math.log1p(fraction)] = f"{fraction:g}"
+
+    unique_xtick_positions = sorted(tick_label_by_position.keys())
+    xtick_text = ",".join(f"{tick:.6f}" for tick in unique_xtick_positions)
+    xtick_labels_text = ",".join(tick_label_by_position[tick] for tick in unique_xtick_positions)
+
+    candidate_metric_keys = metric_keys if metric_keys is not None else ["mae", "mae_seconds"]
+    value_transform = transform if transform is not None else (lambda value: value / 3600.0)
+
+    method_to_coordinates: dict[str, list[str]] = {}
+    min_mae: float | None = None
+    for method in methods:
+        coordinates: list[str] = []
+        for percentage in percentages:
+            fraction = percentage_code_to_fraction(percentage)
+            if fraction is None:
+                continue
+            payload = data.get(method, {}).get(log_name, {}).get(percentage)
+            mae_value = get_numeric_metric(payload, candidate_metric_keys)
+            if mae_value is None:
+                continue
+            mae_value = value_transform(mae_value)
+            x_value = math.log1p(fraction)
+            min_mae = mae_value if min_mae is None else min(min_mae, mae_value)
+            coordinates.append(f"({x_value:.6f},{mae_value:.{decimals}f})")
+        method_to_coordinates[method] = coordinates
+
+    axis_options = [
+        r"width=0.8\textwidth",
+        r"height=0.45\textwidth",
+        r"xlabel={log(1 + Data Fraction (\%))}",
+        r"ylabel={MAE (hours)}",
+        r"grid=major",
+        r"legend style={at={(0.5,-0.22)}, anchor=north}",
+        r"legend columns=2",
+        f"ymin={(min_mae if min_mae is not None else 0.0):.{decimals}f}",
+    ]
+    if xtick_text:
+        axis_options.append(rf"xtick={{{xtick_text}}}")
+    if xtick_labels_text:
+        axis_options.append(rf"xticklabels={{{xtick_labels_text}}}")
+
+    lines.append(r"\begin{axis}[")
+    lines.append(",\n".join(axis_options))
+    lines.append(r"]")
+
+    for method in methods:
+        coordinates = method_to_coordinates.get(method, [])
+        if not coordinates:
+            continue
+
+        color = PLOT_METHOD_COLORS.get(method, "black")
+        lines.append(
+            rf"\addplot+[smooth, thick, color={color}, mark=*] coordinates {{ {' '.join(coordinates)} }};"
+        )
+        lines.append(rf"\addlegendentry{{{latex_escape(method)}}}")
+
+    lines.append(r"\end{axis}")
+    lines.append(r"\end{tikzpicture}")
+    if title is None:
+        method_list = join_for_caption(methods)
+        auto_title = (
+            f"Regression MAE by data fraction for the {latex_escape(log_name)} event log "
+            f"(methods: {method_list})."
+        )
+    else:
+        auto_title = title
+    lines.append(rf"\caption{{{auto_title}}}")
+    lines.append(rf"\label{{{label}}}")
+    lines.append(r"\end{figure}")
+    return "\n".join(lines)
+
+
 def main() -> None:
     repo_root = Path(__file__).resolve().parent
     output_path = repo_root / "preliminary_output.tex"
@@ -581,6 +674,13 @@ def main() -> None:
         percentages=table_percentages,
         data=cls_data,
     )
+    figure_helpdesk_accuracy = render_accuracy_tikz_plot(
+        label="fig:helpdesk-classification-accuracy-curves",
+        log_name="helpdesk",
+        methods=["knn", "tabpfn", "our_fm", "our_fm_knn"],
+        percentages=table_percentages,
+        data=cls_data,
+    )
 
     mae_gap_averages = compute_average_percentage_gap(
         methods=regression_methods,
@@ -598,6 +698,20 @@ def main() -> None:
         percentages=gap_percentages,
         selected_methods=TARGET_GAP_METHODS,
         averages=mae_gap_averages,
+    )
+    figure_billing_mae = render_regression_mae_tikz_plot(
+        label="fig:billing-regression-mae-curves",
+        log_name="billing",
+        methods=["knn", "tabpfn", "our_fm", "our_fm_knn"],
+        percentages=table_percentages,
+        data=reg_data,
+    )
+    figure_sepsis_mae = render_regression_mae_tikz_plot(
+        label="fig:sepsis-regression-mae-curves",
+        log_name="sepsis",
+        methods=["knn", "tabpfn", "our_fm", "our_fm_knn"],
+        percentages=table_percentages,
+        data=reg_data,
     )
 
     header = "\n".join(
@@ -624,8 +738,20 @@ def main() -> None:
     )
 
     sections = [
-        table_accuracy + "\n\n" + table_accuracy_gap + "\n\n" + figure_billing_accuracy,
-        table_mae + "\n\n" + table_mae_gap,
+        table_accuracy
+        + "\n\n"
+        + table_accuracy_gap
+        + "\n\n"
+        + figure_billing_accuracy
+        + "\n\n"
+        + figure_helpdesk_accuracy,
+        table_mae
+        + "\n\n"
+        + table_mae_gap
+        + "\n\n"
+        + figure_billing_mae
+        + "\n\n"
+        + figure_sepsis_mae,
         table_r2,
     ]
     body = "\n\n\\clearpage\\newpage\n\n".join(sections)
