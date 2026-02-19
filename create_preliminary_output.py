@@ -290,6 +290,91 @@ def render_average_percentage_gap_table(
     return "\n".join(lines)
 
 
+def render_average_percentage_gap_tikz_plot(
+    label: str,
+    percentages: list[str],
+    selected_methods: list[str],
+    averages: dict[str, dict[str, float | None]],
+    decimals: int = 2,
+    title: str | None = None,
+) -> str:
+    lines: list[str] = []
+    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\centering")
+    lines.append(r"\begin{tikzpicture}")
+
+    tick_label_by_position: dict[float, str] = {}
+    for percentage in percentages:
+        fraction = percentage_code_to_fraction(percentage)
+        if fraction is not None:
+            tick_label_by_position[math.log1p(fraction)] = f"{fraction:g}"
+
+    unique_xtick_positions = sorted(tick_label_by_position.keys())
+    xtick_text = ",".join(f"{tick:.6f}" for tick in unique_xtick_positions)
+    xtick_labels_text = ",".join(tick_label_by_position[tick] for tick in unique_xtick_positions)
+
+    method_to_coordinates: dict[str, list[str]] = {}
+    min_gap: float | None = None
+    for method in selected_methods:
+        coordinates: list[str] = []
+        for percentage in percentages:
+            fraction = percentage_code_to_fraction(percentage)
+            if fraction is None:
+                continue
+            gap_value = averages.get(percentage, {}).get(method)
+            if gap_value is None:
+                continue
+            x_value = math.log1p(fraction)
+            min_gap = gap_value if min_gap is None else min(min_gap, gap_value)
+            coordinates.append(f"({x_value:.6f},{gap_value:.{decimals}f})")
+        method_to_coordinates[method] = coordinates
+
+    axis_options = [
+        r"width=0.8\textwidth",
+        r"height=0.45\textwidth",
+        r"xlabel={log(1 + Data Fraction (\%))}",
+        r"ylabel={Average Gap to Best (\%)}",
+        r"grid=major",
+        r"legend style={at={(0.5,-0.22)}, anchor=north}",
+        r"legend columns=2",
+        f"ymin={(min_gap if min_gap is not None else 0.0):.{decimals}f}",
+    ]
+    if xtick_text:
+        axis_options.append(rf"xtick={{{xtick_text}}}")
+    if xtick_labels_text:
+        axis_options.append(rf"xticklabels={{{xtick_labels_text}}}")
+
+    lines.append(r"\begin{axis}[")
+    lines.append(",\n".join(axis_options))
+    lines.append(r"]")
+
+    for method in selected_methods:
+        coordinates = method_to_coordinates.get(method, [])
+        if not coordinates:
+            continue
+
+        color = PLOT_METHOD_COLORS.get(method, "black")
+        lines.append(
+            rf"\addplot+[smooth, thick, color={color}, mark=*] coordinates {{ {' '.join(coordinates)} }};"
+        )
+        lines.append(rf"\addlegendentry{{{latex_escape(method)}}}")
+
+    lines.append(r"\end{axis}")
+    lines.append(r"\end{tikzpicture}")
+    if title is None:
+        method_list = join_for_caption(selected_methods)
+        auto_title = (
+            "Average percentage gap to the best classification model by data fraction "
+            f"(methods: {method_list}; lower is better)."
+        )
+    else:
+        auto_title = title
+    lines.append(rf"\caption{{{auto_title}}}")
+    lines.append(rf"\label{{{label}}}")
+    lines.append(r"\end{figure}")
+    return "\n".join(lines)
+
+
 def render_table(
     title: str,
     label: str,
@@ -667,6 +752,12 @@ def main() -> None:
         selected_methods=TARGET_GAP_METHODS,
         averages=classification_gap_averages,
     )
+    figure_classification_gap = render_average_percentage_gap_tikz_plot(
+        label="fig:classification-average-gap-to-best-curves",
+        percentages=gap_percentages,
+        selected_methods=["knn", "tabpfn", "our_fm", "our_fm_knn"],
+        averages=classification_gap_averages,
+    )
     figure_billing_accuracy = render_accuracy_tikz_plot(
         label="fig:billing-classification-accuracy-curves",
         log_name="billing",
@@ -741,6 +832,8 @@ def main() -> None:
         table_accuracy
         + "\n\n"
         + table_accuracy_gap
+        + "\n\n"
+        + figure_classification_gap
         + "\n\n"
         + figure_billing_accuracy
         + "\n\n"
