@@ -56,6 +56,67 @@ def read_json(path: Path) -> dict[str, Any] | None:
         return None
 
 
+def parse_numeric(value: str | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        number = float(value.strip())
+    except (TypeError, ValueError, AttributeError):
+        return None
+    if math.isnan(number) or math.isinf(number):
+        return None
+    return number
+
+
+def parse_confidence_range_median(range_text: str | None) -> float | None:
+    if not range_text:
+        return None
+    stripped = range_text.strip()
+    if not stripped.startswith("[") or not stripped.endswith("]"):
+        return None
+    body = stripped[1:-1]
+    parts = [part.strip() for part in body.split(",")]
+    if len(parts) != 2:
+        return None
+    low = parse_numeric(parts[0])
+    high = parse_numeric(parts[1])
+    if low is None or high is None:
+        return None
+    return (low + high) / 2.0
+
+
+def load_bucket_rows(path: Path) -> dict[str, list[dict[str, str]]]:
+    if not path.exists():
+        return {}
+
+    lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if not lines:
+        return {}
+
+    header = lines[0].split(";")
+    if header and header[-1] == "":
+        header = header[:-1]
+
+    buckets_by_log: dict[str, list[dict[str, str]]] = {}
+    for line in lines[1:]:
+        fields = line.split(";")
+        if fields and fields[-1] == "":
+            fields = fields[:-1]
+        if len(fields) < len(header):
+            fields = fields + [""] * (len(header) - len(fields))
+        row = {key: fields[idx] for idx, key in enumerate(header)}
+        log_name = row.get("log", "").strip()
+        if not log_name:
+            continue
+        buckets_by_log.setdefault(log_name, []).append(row)
+
+    for log_name, rows in buckets_by_log.items():
+        rows.sort(key=lambda row: int(row.get("bucket", "0")) if row.get("bucket", "").isdigit() else 0)
+        buckets_by_log[log_name] = rows
+
+    return buckets_by_log
+
+
 def discover_logs(base_logs_dir: Path) -> list[str]:
     if not base_logs_dir.exists():
         return []
@@ -375,6 +436,118 @@ def render_average_percentage_gap_tikz_plot(
     return "\n".join(lines)
 
 
+def render_classification_bucket_dual_tikz_plot(
+    log_name: str,
+    bucket_rows: list[dict[str, str]],
+    label: str,
+    title: str | None = None,
+    decimals: int = 2,
+) -> str:
+    fm_fixed_coords: list[str] = []
+    rf_fixed_coords: list[str] = []
+    fm_range_coords: list[str] = []
+    rf_range_coords: list[str] = []
+
+    for row in bucket_rows:
+        bucket_value = parse_numeric(row.get("bucket"))
+        if bucket_value is None:
+            continue
+
+        fm_accuracy = parse_numeric(row.get("fm_classification_accuracy"))
+        rf_accuracy = parse_numeric(row.get("classic_rf_accuracy"))
+
+        if fm_accuracy is not None:
+            fm_fixed_coords.append(f"({bucket_value:.0f},{(fm_accuracy * 100.0):.{decimals}f})")
+        if rf_accuracy is not None:
+            rf_fixed_coords.append(f"({bucket_value:.0f},{(rf_accuracy * 100.0):.{decimals}f})")
+
+        fm_median = parse_confidence_range_median(row.get("fm_classification_bucket_range"))
+        rf_median = parse_confidence_range_median(row.get("classic_rf_classification_bucket_range"))
+
+        if fm_accuracy is not None and fm_median is not None:
+            fm_range_coords.append(f"({math.log1p(fm_median):.6f},{(fm_accuracy * 100.0):.{decimals}f})")
+        if rf_accuracy is not None and rf_median is not None:
+            rf_range_coords.append(f"({math.log1p(rf_median):.6f},{(rf_accuracy * 100.0):.{decimals}f})")
+
+    if title is None:
+        auto_title = (
+            f"Classification bucket-wise accuracy comparison for the {latex_escape(log_name)} event log. "
+            "Left: fixed bucket IDs. Right: median confidence positions with log(1+X)."
+        )
+    else:
+        auto_title = title
+
+    lines: list[str] = []
+    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\centering")
+    lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\begin{tikzpicture}")
+    lines.append(r"\begin{axis}[")
+    lines.append(",\n".join(
+        [
+            r"width=\textwidth",
+            r"height=0.65\textwidth",
+            r"title={Fixed Buckets}",
+            r"xlabel={Bucket}",
+            r"ylabel={Accuracy (\%)}",
+            r"grid=major",
+            r"ymin=0",
+            r"ymax=100",
+            r"xtick={1,2,3,4,5}",
+            r"legend style={at={(0.5,-0.25)}, anchor=north}",
+            r"legend columns=2",
+        ]
+    ))
+    lines.append(r"]")
+    if fm_fixed_coords:
+        lines.append(
+            rf"\addplot+[smooth, thick, color=red, mark=*] coordinates {{ {' '.join(fm_fixed_coords)} }};"
+        )
+        lines.append(r"\addlegendentry{fm}")
+    if rf_fixed_coords:
+        lines.append(
+            rf"\addplot+[smooth, thick, color=blue, mark=*] coordinates {{ {' '.join(rf_fixed_coords)} }};"
+        )
+        lines.append(r"\addlegendentry{classic\_rf}")
+    lines.append(r"\end{axis}")
+    lines.append(r"\end{tikzpicture}")
+    lines.append(r"\end{minipage}")
+    lines.append(r"\hfill")
+    lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\begin{tikzpicture}")
+    lines.append(r"\begin{axis}[")
+    lines.append(",\n".join(
+        [
+            r"width=\textwidth",
+            r"height=0.65\textwidth",
+            r"title={Confidence-Range Medians}",
+            r"xlabel={log(1 + median confidence)}",
+            r"ylabel={Accuracy (\%)}",
+            r"grid=major",
+            r"ymin=0",
+            r"ymax=100",
+        ]
+    ))
+    lines.append(r"]")
+    if fm_range_coords:
+        lines.append(
+            rf"\addplot+[smooth, thick, color=red, mark=*] coordinates {{ {' '.join(fm_range_coords)} }};"
+        )
+    if rf_range_coords:
+        lines.append(
+            rf"\addplot+[smooth, thick, color=blue, mark=*] coordinates {{ {' '.join(rf_range_coords)} }};"
+        )
+    lines.append(r"\end{axis}")
+    lines.append(r"\end{tikzpicture}")
+    lines.append(r"\end{minipage}")
+    lines.append(rf"\caption{{{auto_title}}}")
+    lines.append(rf"\label{{{label}}}")
+    lines.append(r"\end{figure}")
+    return "\n".join(lines)
+
+
 def render_regression_mae_gap_tikz_plot(
     label: str,
     percentages: list[str],
@@ -680,6 +853,7 @@ def render_regression_mae_tikz_plot(
 def main() -> None:
     repo_root = Path(__file__).resolve().parent
     output_path = repo_root / "preliminary_output.tex"
+    buckets_path = repo_root / "other_data" / "buckets.txt"
 
     parser = argparse.ArgumentParser(
         description="Build LaTeX summary tables from classification/regression experiment JSON results."
@@ -837,6 +1011,15 @@ def main() -> None:
         percentages=table_percentages,
         data=reg_data,
     )
+    bucket_rows_by_log = load_bucket_rows(buckets_path)
+    classification_bucket_figures: list[str] = []
+    for bucket_log_name in sorted(bucket_rows_by_log):
+        figure = render_classification_bucket_dual_tikz_plot(
+            log_name=bucket_log_name,
+            bucket_rows=bucket_rows_by_log[bucket_log_name],
+            label=f"fig:{bucket_log_name}-classification-bucket-comparison",
+        )
+        classification_bucket_figures.append(figure)
 
     header = "\n".join(
         [
@@ -882,6 +1065,12 @@ def main() -> None:
         + figure_sepsis_mae,
         table_r2,
     ]
+    if classification_bucket_figures:
+        sections.append(
+            r"\section{Classification Confidence Buckets}"
+            + "\n\n"
+            + "\n\n".join(classification_bucket_figures)
+        )
     body = "\n\n\\clearpage\\newpage\n\n".join(sections)
     tex_content = header + body + "\n\n\\end{document}\n"
     output_path.write_text(tex_content, encoding="utf-8")
