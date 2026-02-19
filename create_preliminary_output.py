@@ -20,6 +20,7 @@ PLOT_METHOD_COLORS = {
     "our_fm": "red",
     "our_fm_knn": "orange",
 }
+THICK_LINE_METHODS = {"our_fm", "our_fm_knn"}
 
 
 def strip_xes_suffix(name: str) -> str:
@@ -147,6 +148,10 @@ def load_results(results_dir: Path) -> tuple[set[str], dict[str, dict[str, dict[
                 data.setdefault(method_name, {}).setdefault(log_name, {})[percentage] = payload
 
     return methods, data
+
+
+def method_line_thickness(method_name: str) -> str:
+    return "line width=2.6pt" if method_name in THICK_LINE_METHODS else "thick"
 
 
 def method_sort_key(method_name: str) -> tuple[int, str]:
@@ -415,8 +420,9 @@ def render_average_percentage_gap_tikz_plot(
             continue
 
         color = PLOT_METHOD_COLORS.get(method, "black")
+        line_thickness = method_line_thickness(method)
         lines.append(
-            rf"\addplot+[smooth, thick, color={color}, mark=*] coordinates {{ {' '.join(coordinates)} }};"
+            rf"\addplot+[smooth, {line_thickness}, color={color}, mark=*] coordinates {{ {' '.join(coordinates)} }};"
         )
         lines.append(rf"\addlegendentry{{{latex_escape(method)}}}")
 
@@ -502,7 +508,7 @@ def render_classification_bucket_dual_tikz_plot(
     lines.append(r"]")
     if fm_fixed_coords:
         lines.append(
-            rf"\addplot+[smooth, thick, color=red, mark=*] coordinates {{ {' '.join(fm_fixed_coords)} }};"
+            rf"\addplot+[smooth, line width=2.6pt, color=red, mark=*] coordinates {{ {' '.join(fm_fixed_coords)} }};"
         )
         lines.append(r"\addlegendentry{fm}")
     if rf_fixed_coords:
@@ -533,7 +539,7 @@ def render_classification_bucket_dual_tikz_plot(
     lines.append(r"]")
     if fm_range_coords:
         lines.append(
-            rf"\addplot+[smooth, thick, color=red, mark=*] coordinates {{ {' '.join(fm_range_coords)} }};"
+            rf"\addplot+[smooth, line width=2.6pt, color=red, mark=*] coordinates {{ {' '.join(fm_range_coords)} }};"
         )
     if rf_range_coords:
         lines.append(
@@ -612,7 +618,7 @@ def render_regression_mae_bucket_dual_tikz_plot(
     lines.append(r"]")
     if fm_fixed_coords:
         lines.append(
-            rf"\addplot+[smooth, thick, color=red, mark=*] coordinates {{ {' '.join(fm_fixed_coords)} }};"
+            rf"\addplot+[smooth, line width=2.6pt, color=red, mark=*] coordinates {{ {' '.join(fm_fixed_coords)} }};"
         )
         lines.append(r"\addlegendentry{fm}")
     if rf_fixed_coords:
@@ -641,7 +647,7 @@ def render_regression_mae_bucket_dual_tikz_plot(
     lines.append(r"]")
     if fm_range_coords:
         lines.append(
-            rf"\addplot+[smooth, thick, color=red, mark=*] coordinates {{ {' '.join(fm_range_coords)} }};"
+            rf"\addplot+[smooth, line width=2.6pt, color=red, mark=*] coordinates {{ {' '.join(fm_range_coords)} }};"
         )
     if rf_range_coords:
         lines.append(
@@ -844,8 +850,9 @@ def render_accuracy_tikz_plot(
             continue
 
         color = PLOT_METHOD_COLORS.get(method, "black")
+        line_thickness = method_line_thickness(method)
         lines.append(
-            rf"\addplot+[smooth, thick, color={color}, mark=*] coordinates {{ {' '.join(coordinates)} }};"
+            rf"\addplot+[smooth, {line_thickness}, color={color}, mark=*] coordinates {{ {' '.join(coordinates)} }};"
         )
         lines.append(rf"\addlegendentry{{{latex_escape(method)}}}")
 
@@ -937,8 +944,9 @@ def render_regression_mae_tikz_plot(
             continue
 
         color = PLOT_METHOD_COLORS.get(method, "black")
+        line_thickness = method_line_thickness(method)
         lines.append(
-            rf"\addplot+[smooth, thick, color={color}, mark=*] coordinates {{ {' '.join(coordinates)} }};"
+            rf"\addplot+[smooth, {line_thickness}, color={color}, mark=*] coordinates {{ {' '.join(coordinates)} }};"
         )
         lines.append(rf"\addlegendentry{{{latex_escape(method)}}}")
 
