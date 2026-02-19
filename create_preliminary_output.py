@@ -548,6 +548,114 @@ def render_classification_bucket_dual_tikz_plot(
     return "\n".join(lines)
 
 
+def render_regression_mae_bucket_dual_tikz_plot(
+    log_name: str,
+    bucket_rows: list[dict[str, str]],
+    label: str,
+    title: str | None = None,
+    decimals: int = 2,
+) -> str:
+    fm_fixed_coords: list[str] = []
+    rf_fixed_coords: list[str] = []
+    fm_range_coords: list[str] = []
+    rf_range_coords: list[str] = []
+
+    for row in bucket_rows:
+        bucket_value = parse_numeric(row.get("bucket"))
+        if bucket_value is None:
+            continue
+
+        fm_mae = parse_numeric(row.get("fm_mae"))
+        rf_mae = parse_numeric(row.get("classic_rf_mae"))
+
+        if fm_mae is not None:
+            fm_fixed_coords.append(f"({bucket_value:.0f},{fm_mae:.{decimals}f})")
+        if rf_mae is not None:
+            rf_fixed_coords.append(f"({bucket_value:.0f},{rf_mae:.{decimals}f})")
+
+        fm_median = parse_confidence_range_median(row.get("fm_regression_bucket_range"))
+        rf_median = parse_confidence_range_median(row.get("classic_rf_regression_bucket_range"))
+
+        if fm_mae is not None and fm_median is not None:
+            fm_range_coords.append(f"({math.log1p(fm_median):.6f},{fm_mae:.{decimals}f})")
+        if rf_mae is not None and rf_median is not None:
+            rf_range_coords.append(f"({math.log1p(rf_median):.6f},{rf_mae:.{decimals}f})")
+
+    if title is None:
+        auto_title = (
+            f"Regression MAE bucket-wise comparison for the {latex_escape(log_name)} event log. "
+            "Left: fixed bucket IDs. Right: median confidence positions with log(1+X)."
+        )
+    else:
+        auto_title = title
+
+    lines: list[str] = []
+    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\centering")
+    lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\begin{tikzpicture}")
+    lines.append(r"\begin{axis}[")
+    lines.append(",\n".join(
+        [
+            r"width=\textwidth",
+            r"height=0.65\textwidth",
+            r"title={Fixed Buckets}",
+            r"xlabel={Bucket}",
+            r"ylabel={MAE}",
+            r"grid=major",
+            r"xtick={1,2,3,4,5}",
+            r"legend style={at={(0.5,-0.25)}, anchor=north}",
+            r"legend columns=2",
+        ]
+    ))
+    lines.append(r"]")
+    if fm_fixed_coords:
+        lines.append(
+            rf"\addplot+[smooth, thick, color=red, mark=*] coordinates {{ {' '.join(fm_fixed_coords)} }};"
+        )
+        lines.append(r"\addlegendentry{fm}")
+    if rf_fixed_coords:
+        lines.append(
+            rf"\addplot+[smooth, thick, color=blue, mark=*] coordinates {{ {' '.join(rf_fixed_coords)} }};"
+        )
+        lines.append(r"\addlegendentry{classic\_rf}")
+    lines.append(r"\end{axis}")
+    lines.append(r"\end{tikzpicture}")
+    lines.append(r"\end{minipage}")
+    lines.append(r"\hfill")
+    lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\begin{tikzpicture}")
+    lines.append(r"\begin{axis}[")
+    lines.append(",\n".join(
+        [
+            r"width=\textwidth",
+            r"height=0.65\textwidth",
+            r"title={Confidence-Range Medians}",
+            r"xlabel={log(1 + median confidence)}",
+            r"ylabel={MAE}",
+            r"grid=major",
+        ]
+    ))
+    lines.append(r"]")
+    if fm_range_coords:
+        lines.append(
+            rf"\addplot+[smooth, thick, color=red, mark=*] coordinates {{ {' '.join(fm_range_coords)} }};"
+        )
+    if rf_range_coords:
+        lines.append(
+            rf"\addplot+[smooth, thick, color=blue, mark=*] coordinates {{ {' '.join(rf_range_coords)} }};"
+        )
+    lines.append(r"\end{axis}")
+    lines.append(r"\end{tikzpicture}")
+    lines.append(r"\end{minipage}")
+    lines.append(rf"\caption{{{auto_title}}}")
+    lines.append(rf"\label{{{label}}}")
+    lines.append(r"\end{figure}")
+    return "\n".join(lines)
+
+
 def render_regression_mae_gap_tikz_plot(
     label: str,
     percentages: list[str],
@@ -1013,13 +1121,20 @@ def main() -> None:
     )
     bucket_rows_by_log = load_bucket_rows(buckets_path)
     classification_bucket_figures: list[str] = []
+    regression_mae_bucket_figures: list[str] = []
     for bucket_log_name in sorted(bucket_rows_by_log):
-        figure = render_classification_bucket_dual_tikz_plot(
+        figure_classification = render_classification_bucket_dual_tikz_plot(
             log_name=bucket_log_name,
             bucket_rows=bucket_rows_by_log[bucket_log_name],
             label=f"fig:{bucket_log_name}-classification-bucket-comparison",
         )
-        classification_bucket_figures.append(figure)
+        classification_bucket_figures.append(figure_classification)
+        figure_regression_mae = render_regression_mae_bucket_dual_tikz_plot(
+            log_name=bucket_log_name,
+            bucket_rows=bucket_rows_by_log[bucket_log_name],
+            label=f"fig:{bucket_log_name}-regression-mae-bucket-comparison",
+        )
+        regression_mae_bucket_figures.append(figure_regression_mae)
 
     header = "\n".join(
         [
@@ -1070,6 +1185,12 @@ def main() -> None:
             r"\section{Classification Confidence Buckets}"
             + "\n\n"
             + "\n\n".join(classification_bucket_figures)
+        )
+    if regression_mae_bucket_figures:
+        sections.append(
+            r"\section{Regression MAE Confidence Buckets}"
+            + "\n\n"
+            + "\n\n".join(regression_mae_bucket_figures)
         )
     body = "\n\n\\clearpage\\newpage\n\n".join(sections)
     tex_content = header + body + "\n\n\\end{document}\n"
