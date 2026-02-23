@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 TARGET_PERCENTAGE_CODES = ["0005", "0010", "0030", "0050", "0100", "0200", "0500", "1000"]
+TABLE_PERCENTAGE_CODES = ["0005", "0030", "0050", "0100", "0200", "1000"]
 TARGET_GAP_METHODS = ["tabpfn", "knn", "our_fm", "our_fm_knn"]
 GAP_METHOD_LABELS = {
     "our_fm": "fm",
@@ -26,6 +27,8 @@ MI_MEAN_COLUMN = "MI(activity_indicators, time_features) mean"
 MI_PREV_WEIGHTED_COLUMN = "MI(activity_indicators, time_features) prevalence-weighted mean"
 ACT_TIME_CORR_COLUMNS = [DISTANCE_CORR_COLUMN, MI_MEAN_COLUMN, MI_PREV_WEIGHTED_COLUMN]
 MODEL_COLUMN_SPEC = r">{\centering\arraybackslash}p{1cm}"
+THIN_MODEL_VRULE = r"!{\vrule width 0.25pt}"
+THICK_GAP_VRULE = r"!{\vrule width 0.9pt}"
 
 
 def strip_xes_suffix(name: str) -> str:
@@ -61,6 +64,25 @@ def format_method_header_label(method_name: str) -> str:
 
 def with_vertical_rules(column_specs: list[str]) -> str:
     return "|" + "|".join(column_specs) + "|"
+
+
+def build_ml_table_col_spec(prefix_columns: list[str], model_count: int, gap_count: int = 0) -> str:
+    spec = "|" + "|".join(prefix_columns)
+
+    if model_count > 0:
+        spec += THIN_MODEL_VRULE + MODEL_COLUMN_SPEC
+        for _ in range(1, model_count):
+            spec += THIN_MODEL_VRULE + MODEL_COLUMN_SPEC
+
+    if gap_count > 0:
+        spec += THICK_GAP_VRULE + MODEL_COLUMN_SPEC
+        for _ in range(1, gap_count):
+            spec += THICK_GAP_VRULE + MODEL_COLUMN_SPEC
+        spec += THICK_GAP_VRULE
+    else:
+        spec += "|"
+
+    return spec
 
 
 def read_json(path: Path) -> dict[str, Any] | None:
@@ -487,7 +509,7 @@ def render_average_percentage_gap_table(
     averages: dict[str, dict[str, float | None]],
     decimals: int = 2,
 ) -> str:
-    col_spec = with_vertical_rules(["l"] + [MODEL_COLUMN_SPEC] * len(selected_methods))
+    col_spec = build_ml_table_col_spec(prefix_columns=["l"], model_count=len(selected_methods))
     lines: list[str] = []
     lines.append(r"\begin{table}[ht]")
     lines.append(r"\centering")
@@ -936,7 +958,11 @@ def render_table(
         r"\textcolor{orange}{orange} = third best."
     )
     gap_methods = gap_methods or []
-    col_spec = with_vertical_rules(["l", "l"] + [MODEL_COLUMN_SPEC] * len(methods) + [MODEL_COLUMN_SPEC] * len(gap_methods))
+    col_spec = build_ml_table_col_spec(
+        prefix_columns=["l", "l"],
+        model_count=len(methods),
+        gap_count=len(gap_methods),
+    )
     lines: list[str] = []
     lines.append(r"\begin{table}[ht]")
     lines.append(r"\centering")
@@ -1231,7 +1257,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    table_percentages = ensure_required_percentages(args.percentages, required_codes=["0100"])
+    requested_percentages = ensure_required_percentages(args.percentages, required_codes=["0100"])
+    table_percentages = [code for code in requested_percentages if code in TABLE_PERCENTAGE_CODES]
     discovered_logs = discover_logs(args.base_logs_dir)
     logs = args.logs if args.logs else discovered_logs
     if not logs:
@@ -1293,7 +1320,7 @@ def main() -> None:
     table_accuracy_gap = render_average_percentage_gap_table(
         title="Average percentage gap to the best classification model (lower is better).",
         label="tab:classification-gap-to-best",
-        percentages=gap_percentages,
+        percentages=table_percentages,
         selected_methods=TARGET_GAP_METHODS,
         averages=classification_gap_averages,
     )
@@ -1307,14 +1334,14 @@ def main() -> None:
         label="fig:billing-classification-accuracy-curves",
         log_name="billing",
         methods=["knn", "tabpfn", "our_fm", "our_fm_knn"],
-        percentages=table_percentages,
+        percentages=TARGET_PERCENTAGE_CODES,
         data=cls_data,
     )
     figure_helpdesk_accuracy = render_accuracy_tikz_plot(
         label="fig:helpdesk-classification-accuracy-curves",
         log_name="helpdesk",
         methods=["knn", "tabpfn", "our_fm", "our_fm_knn"],
-        percentages=table_percentages,
+        percentages=TARGET_PERCENTAGE_CODES,
         data=cls_data,
     )
 
@@ -1331,7 +1358,7 @@ def main() -> None:
     table_mae_gap = render_average_percentage_gap_table(
         title="Average percentage gap to the best MAE model (lower is better).",
         label="tab:mae-gap-to-best",
-        percentages=gap_percentages,
+        percentages=table_percentages,
         selected_methods=TARGET_GAP_METHODS,
         averages=mae_gap_averages,
     )
@@ -1345,14 +1372,14 @@ def main() -> None:
         label="fig:billing-regression-mae-curves",
         log_name="billing",
         methods=["knn", "tabpfn", "our_fm", "our_fm_knn"],
-        percentages=table_percentages,
+        percentages=TARGET_PERCENTAGE_CODES,
         data=reg_data,
     )
     figure_sepsis_mae = render_regression_mae_tikz_plot(
         label="fig:sepsis-regression-mae-curves",
         log_name="sepsis",
         methods=["knn", "tabpfn", "our_fm", "our_fm_knn"],
-        percentages=table_percentages,
+        percentages=TARGET_PERCENTAGE_CODES,
         data=reg_data,
     )
 
