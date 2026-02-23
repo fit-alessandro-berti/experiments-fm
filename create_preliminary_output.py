@@ -10,6 +10,7 @@ from typing import Any
 
 TARGET_PERCENTAGE_CODES = ["0005", "0010", "0030", "0050", "0100", "0200", "0500", "1000"]
 TABLE_PERCENTAGE_CODES = ["0005", "0030", "0050", "0100", "0200", "1000"]
+TARGET_CLASSIFICATION_BUCKET_LOGS = ["receipt", "roadtraffic", "sepsis"]
 TARGET_GAP_METHODS = ["tabpfn", "knn", "our_fm", "our_fm_knn"]
 GAP_METHOD_LABELS = {
     "our_fm": "fm",
@@ -798,6 +799,162 @@ def render_classification_bucket_dual_tikz_plot(
     lines.append(r"\end{tikzpicture}")
     lines.append(r"\end{minipage}")
     lines.append(rf"\caption{{{auto_title}}}")
+    lines.append(rf"\label{{{label}}}")
+    lines.append(r"\end{figure}")
+    return "\n".join(lines)
+
+
+def collect_classification_bucket_coordinates(
+    bucket_rows: list[dict[str, str]],
+    decimals: int = 2,
+) -> tuple[list[str], list[str], list[str], list[str]]:
+    fm_fixed_coords: list[str] = []
+    rf_fixed_coords: list[str] = []
+    fm_range_coords: list[str] = []
+    rf_range_coords: list[str] = []
+
+    for row in bucket_rows:
+        bucket_value = parse_numeric(row.get("bucket"))
+        if bucket_value is None:
+            continue
+
+        fm_accuracy = parse_numeric(row.get("fm_classification_accuracy"))
+        rf_accuracy = parse_numeric(row.get("classic_rf_accuracy"))
+
+        if fm_accuracy is not None:
+            fm_fixed_coords.append(f"({bucket_value:.0f},{(fm_accuracy * 100.0):.{decimals}f})")
+        if rf_accuracy is not None:
+            rf_fixed_coords.append(f"({bucket_value:.0f},{(rf_accuracy * 100.0):.{decimals}f})")
+
+        fm_median = parse_confidence_range_median(row.get("fm_classification_bucket_range"))
+        rf_median = parse_confidence_range_median(row.get("classic_rf_classification_bucket_range"))
+        if fm_accuracy is not None and fm_median is not None:
+            fm_range_coords.append(f"({math.log1p(fm_median):.6f},{(fm_accuracy * 100.0):.{decimals}f})")
+        if rf_accuracy is not None and rf_median is not None:
+            rf_range_coords.append(f"({math.log1p(rf_median):.6f},{(rf_accuracy * 100.0):.{decimals}f})")
+
+    return fm_fixed_coords, rf_fixed_coords, fm_range_coords, rf_range_coords
+
+
+def render_classification_bucket_compact_figure(
+    bucket_rows_by_log: dict[str, list[dict[str, str]]],
+    selected_logs: list[str],
+    label: str,
+    decimals: int = 2,
+) -> str | None:
+    available_logs = [log_name for log_name in selected_logs if log_name in bucket_rows_by_log]
+    if not available_logs:
+        available_logs = sorted(bucket_rows_by_log.keys())
+    if not available_logs:
+        return None
+
+    lines: list[str] = []
+    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\centering")
+
+    lines.append(r"\begin{minipage}[t]{\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\textbf{Fixed Buckets}\\[2pt]")
+    for idx, log_name in enumerate(available_logs):
+        fm_fixed, rf_fixed, _, _ = collect_classification_bucket_coordinates(
+            bucket_rows=bucket_rows_by_log[log_name],
+            decimals=decimals,
+        )
+        lines.append(r"\begin{minipage}[t]{0.30\textwidth}")
+        lines.append(r"\centering")
+        axis_options = [
+            r"width=\textwidth",
+            r"height=0.62\textwidth",
+            rf"title={{{latex_escape(log_name)}}}",
+            r"xlabel={Bucket}",
+            r"grid=major",
+            r"scale only axis",
+            r"ymin=0",
+            r"ymax=100",
+            r"xtick={1,2,3,4,5}",
+            r"tick label style={font=\tiny}",
+            r"label style={font=\scriptsize}",
+            r"title style={font=\scriptsize}",
+            r"legend style={at={(0.5,-0.30)}, anchor=north, font=\tiny, draw=none, fill=white}",
+            r"legend columns=1",
+        ]
+        if idx == 0:
+            axis_options.append(r"ylabel={Accuracy (\%)}")
+
+        lines.append(r"\begin{tikzpicture}")
+        lines.append(r"\begin{axis}[")
+        lines.append(",\n".join(axis_options))
+        lines.append(r"]")
+        if fm_fixed:
+            lines.append(
+                rf"\addplot+[smooth, line width=2.6pt, color=red, mark=*] coordinates {{ {' '.join(fm_fixed)} }};"
+            )
+            lines.append(r"\addlegendentry{fm}")
+        if rf_fixed:
+            lines.append(
+                rf"\addplot+[smooth, thick, color=blue, mark=*] coordinates {{ {' '.join(rf_fixed)} }};"
+            )
+            lines.append(r"\addlegendentry{classic\_rf}")
+        lines.append(r"\end{axis}")
+        lines.append(r"\end{tikzpicture}")
+        lines.append(r"\end{minipage}")
+        if idx < len(available_logs) - 1:
+            lines.append(r"\hspace{0.02\textwidth}")
+    lines.append(r"\end{minipage}")
+
+    lines.append(r"\vspace{16pt}")
+    lines.append(r"\begin{minipage}[t]{\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\textbf{Confidence-Range Medians}\\[2pt]")
+    for idx, log_name in enumerate(available_logs):
+        _, _, fm_range, rf_range = collect_classification_bucket_coordinates(
+            bucket_rows=bucket_rows_by_log[log_name],
+            decimals=decimals,
+        )
+        lines.append(r"\begin{minipage}[t]{0.30\textwidth}")
+        lines.append(r"\centering")
+        axis_options = [
+            r"width=\textwidth",
+            r"height=0.62\textwidth",
+            rf"title={{{latex_escape(log_name)}}}",
+            r"xlabel={log(1+median conf.)}",
+            r"grid=major",
+            r"scale only axis",
+            r"ymin=0",
+            r"ymax=100",
+            r"tick label style={font=\tiny}",
+            r"label style={font=\scriptsize}",
+            r"title style={font=\scriptsize}",
+            r"legend style={at={(0.5,-0.30)}, anchor=north, font=\tiny, draw=none, fill=white}",
+            r"legend columns=1",
+        ]
+        if idx == 0:
+            axis_options.append(r"ylabel={Accuracy (\%)}")
+
+        lines.append(r"\begin{tikzpicture}")
+        lines.append(r"\begin{axis}[")
+        lines.append(",\n".join(axis_options))
+        lines.append(r"]")
+        if fm_range:
+            lines.append(
+                rf"\addplot+[smooth, line width=2.6pt, color=red, mark=*] coordinates {{ {' '.join(fm_range)} }};"
+            )
+            lines.append(r"\addlegendentry{fm}")
+        if rf_range:
+            lines.append(
+                rf"\addplot+[smooth, thick, color=blue, mark=*] coordinates {{ {' '.join(rf_range)} }};"
+            )
+            lines.append(r"\addlegendentry{classic\_rf}")
+        lines.append(r"\end{axis}")
+        lines.append(r"\end{tikzpicture}")
+        lines.append(r"\end{minipage}")
+        if idx < len(available_logs) - 1:
+            lines.append(r"\hspace{0.02\textwidth}")
+    lines.append(r"\end{minipage}")
+
+    lines.append(
+        r"\caption{Compact classification confidence-bucket comparison for receipt, roadtraffic, and sepsis. Left minipage: fixed buckets. Right minipage: confidence-range medians.}"
+    )
     lines.append(rf"\label{{{label}}}")
     lines.append(r"\end{figure}")
     return "\n".join(lines)
@@ -1669,15 +1826,15 @@ def main() -> None:
         )
 
     bucket_rows_by_log = load_bucket_rows(buckets_path)
-    classification_bucket_figures: list[str] = []
+    classification_bucket_compact_figure: str | None = None
     regression_mae_bucket_figures: list[str] = []
-    for bucket_log_name in sorted(bucket_rows_by_log):
-        figure_classification = render_classification_bucket_dual_tikz_plot(
-            log_name=bucket_log_name,
-            bucket_rows=bucket_rows_by_log[bucket_log_name],
-            label=f"fig:{bucket_log_name}-classification-bucket-comparison",
+    if bucket_rows_by_log:
+        classification_bucket_compact_figure = render_classification_bucket_compact_figure(
+            bucket_rows_by_log=bucket_rows_by_log,
+            selected_logs=TARGET_CLASSIFICATION_BUCKET_LOGS,
+            label="fig:classification-buckets-compact-comparison",
         )
-        classification_bucket_figures.append(figure_classification)
+    for bucket_log_name in sorted(bucket_rows_by_log):
         figure_regression_mae = render_regression_mae_bucket_dual_tikz_plot(
             log_name=bucket_log_name,
             bucket_rows=bucket_rows_by_log[bucket_log_name],
@@ -1723,11 +1880,11 @@ def main() -> None:
         + figure_sepsis_mae,
         table_r2,
     ]
-    if classification_bucket_figures:
+    if classification_bucket_compact_figure:
         sections.append(
             r"\section{Classification Confidence Buckets}"
             + "\n\n"
-            + "\n\n".join(classification_bucket_figures)
+            + classification_bucket_compact_figure
         )
     if regression_mae_bucket_figures:
         sections.append(
