@@ -59,6 +59,10 @@ def format_method_header_label(method_name: str) -> str:
     return latex_escape(method_name.replace("_", " "))
 
 
+def with_vertical_rules(column_specs: list[str]) -> str:
+    return "|" + "|".join(column_specs) + "|"
+
+
 def read_json(path: Path) -> dict[str, Any] | None:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -483,7 +487,7 @@ def render_average_percentage_gap_table(
     averages: dict[str, dict[str, float | None]],
     decimals: int = 2,
 ) -> str:
-    col_spec = "l" + (MODEL_COLUMN_SPEC * len(selected_methods))
+    col_spec = with_vertical_rules(["l"] + [MODEL_COLUMN_SPEC] * len(selected_methods))
     lines: list[str] = []
     lines.append(r"\begin{table}[ht]")
     lines.append(r"\centering")
@@ -527,7 +531,7 @@ def render_metric_gap_correlation_table(
     lines.append(rf"\caption{{{title}}}")
     lines.append(rf"\label{{{label}}}")
     lines.append(r"\resizebox{0.85\textwidth}{!}{%")
-    lines.append(r"\begin{tabular}{p{0.60\textwidth}cc}")
+    lines.append(r"\begin{tabular}{|p{0.60\textwidth}|c|c|}")
     lines.append(r"\hline")
     lines.append(r"\textbf{Metric} & \textbf{Pearson $r$} & \textbf{Logs used} \\")
     lines.append(r"\hline")
@@ -553,7 +557,7 @@ def render_csv_table(
     column_order: list[str],
     column_labels: dict[str, str],
 ) -> str:
-    col_spec = "l" + ("c" * (len(column_order) - 1))
+    col_spec = with_vertical_rules(["l"] + ["c"] * (len(column_order) - 1))
     lines: list[str] = []
     lines.append(r"\begin{table}[ht]")
     lines.append(r"\centering")
@@ -932,9 +936,7 @@ def render_table(
         r"\textcolor{orange}{orange} = third best."
     )
     gap_methods = gap_methods or []
-    col_spec = "ll" + (MODEL_COLUMN_SPEC * len(methods))
-    if gap_methods:
-        col_spec += "|" + (MODEL_COLUMN_SPEC * len(gap_methods)) + "|"
+    col_spec = with_vertical_rules(["l", "l"] + [MODEL_COLUMN_SPEC] * len(methods) + [MODEL_COLUMN_SPEC] * len(gap_methods))
     lines: list[str] = []
     lines.append(r"\begin{table}[ht]")
     lines.append(r"\centering")
@@ -1496,6 +1498,7 @@ def main() -> None:
             r"\usepackage{tikz}",
             r"\usepackage{pgfplots}",
             r"\pgfplotsset{compat=1.18}",
+            r"\renewcommand{\arraystretch}{0.92}",
             "",
             r"\title{Trial123}",
             r"\author{a.berti }",
