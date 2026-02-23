@@ -25,6 +25,7 @@ DISTANCE_CORR_COLUMN = "Distance correlation(activity_block, time_block)"
 MI_MEAN_COLUMN = "MI(activity_indicators, time_features) mean"
 MI_PREV_WEIGHTED_COLUMN = "MI(activity_indicators, time_features) prevalence-weighted mean"
 ACT_TIME_CORR_COLUMNS = [DISTANCE_CORR_COLUMN, MI_MEAN_COLUMN, MI_PREV_WEIGHTED_COLUMN]
+MODEL_COLUMN_SPEC = r">{\centering\arraybackslash}p{1cm}"
 
 
 def strip_xes_suffix(name: str) -> str:
@@ -52,6 +53,10 @@ def latex_escape(text: str) -> str:
     for src, dst in replacements.items():
         escaped = escaped.replace(src, dst)
     return escaped
+
+
+def format_method_header_label(method_name: str) -> str:
+    return latex_escape(method_name.replace("_", " "))
 
 
 def read_json(path: Path) -> dict[str, Any] | None:
@@ -478,7 +483,7 @@ def render_average_percentage_gap_table(
     averages: dict[str, dict[str, float | None]],
     decimals: int = 2,
 ) -> str:
-    col_spec = "l" + ("c" * len(selected_methods))
+    col_spec = "l" + (MODEL_COLUMN_SPEC * len(selected_methods))
     lines: list[str] = []
     lines.append(r"\begin{table}[ht]")
     lines.append(r"\centering")
@@ -490,7 +495,7 @@ def render_average_percentage_gap_table(
     lines.append(r"\hline")
 
     header_cells = [r"\textbf{\%}"]
-    header_cells.extend([rf"\textbf{{{latex_escape(method)}}}" for method in selected_methods])
+    header_cells.extend([rf"\textbf{{{format_method_header_label(method)}}}" for method in selected_methods])
     lines.append(" & ".join(header_cells) + r" \\")
     lines.append(r"\hline")
 
@@ -927,9 +932,9 @@ def render_table(
         r"\textcolor{orange}{orange} = third best."
     )
     gap_methods = gap_methods or []
-    col_spec = "ll" + ("c" * len(methods))
+    col_spec = "ll" + (MODEL_COLUMN_SPEC * len(methods))
     if gap_methods:
-        col_spec += "|" + ("c" * len(gap_methods)) + "|"
+        col_spec += "|" + (MODEL_COLUMN_SPEC * len(gap_methods)) + "|"
     lines: list[str] = []
     lines.append(r"\begin{table}[ht]")
     lines.append(r"\centering")
@@ -941,10 +946,10 @@ def render_table(
     lines.append(r"\hline")
 
     header_cells = [r"\textbf{Event Log}", r"\textbf{\%}"]
-    header_cells.extend([rf"\textbf{{{latex_escape(method)}}}" for method in methods])
+    header_cells.extend([rf"\textbf{{{format_method_header_label(method)}}}" for method in methods])
     for method in gap_methods:
         gap_label = GAP_METHOD_LABELS.get(method, method)
-        header_cells.append(rf"\textbf{{{latex_escape(gap_label)} gap}}")
+        header_cells.append(rf"\textbf{{{format_method_header_label(gap_label)} gap}}")
     lines.append(" & ".join(header_cells) + r" \\")
     lines.append(r"\hline")
 
@@ -1485,6 +1490,7 @@ def main() -> None:
         [
             r"\documentclass{article}",
             r"\usepackage{graphicx} % Required for inserting images",
+            r"\usepackage{array}",
             r"\usepackage{xcolor}",
             r"\usepackage{multirow}",
             r"\usepackage{tikz}",
