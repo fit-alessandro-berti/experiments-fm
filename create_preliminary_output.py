@@ -1217,6 +1217,123 @@ def render_regression_mae_tikz_plot(
     return "\n".join(lines)
 
 
+def extract_resizebox_block(latex_content: str) -> str:
+    lines = latex_content.splitlines()
+    start_idx: int | None = None
+    for idx, line in enumerate(lines):
+        if line.startswith(r"\resizebox{"):
+            start_idx = idx
+            break
+    if start_idx is None:
+        return latex_content
+
+    end_idx: int | None = None
+    for idx in range(start_idx + 1, len(lines)):
+        if lines[idx] == r"}":
+            end_idx = idx
+            break
+    if end_idx is None:
+        return "\n".join(lines[start_idx:])
+    return "\n".join(lines[start_idx : end_idx + 1])
+
+
+def extract_tikzpicture_block(latex_content: str) -> str:
+    lines = latex_content.splitlines()
+    start_idx: int | None = None
+    for idx, line in enumerate(lines):
+        if line == r"\begin{tikzpicture}":
+            start_idx = idx
+            break
+    if start_idx is None:
+        return latex_content
+
+    end_idx: int | None = None
+    for idx in range(start_idx, len(lines)):
+        if lines[idx] == r"\end{tikzpicture}":
+            end_idx = idx
+            break
+    if end_idx is None:
+        return "\n".join(lines[start_idx:])
+    return "\n".join(lines[start_idx : end_idx + 1])
+
+
+def set_resizebox_width(resizebox_block: str, width_spec: str = r"\textwidth") -> str:
+    lines = resizebox_block.splitlines()
+    for idx, line in enumerate(lines):
+        if line.startswith(r"\resizebox{"):
+            lines[idx] = rf"\resizebox{{{width_spec}}}{{!}}{{%"
+            break
+    return "\n".join(lines)
+
+
+def adapt_gap_tikz_for_small_minipage(tikz_block: str) -> str:
+    adjusted_lines: list[str] = []
+    for line in tikz_block.splitlines():
+        stripped = line.strip()
+
+        if stripped.startswith("width="):
+            adjusted_lines.append(r"width=\textwidth,")
+            continue
+        if stripped.startswith("height="):
+            adjusted_lines.append(r"height=1.10\textwidth,")
+            continue
+        if stripped.startswith("legend style=") or stripped.startswith("legend columns="):
+            continue
+        if stripped.startswith("xtick={") or stripped.startswith("xticklabels={"):
+            continue
+        if stripped.startswith(r"\addlegendentry{"):
+            continue
+        if stripped == "grid=major,":
+            adjusted_lines.append(line)
+            adjusted_lines.append(r"scale only axis,")
+            adjusted_lines.append(r"tick label style={font=\tiny},")
+            adjusted_lines.append(r"label style={font=\scriptsize},")
+            continue
+
+        adjusted_lines.append(line)
+
+    return "\n".join(adjusted_lines)
+
+
+def render_classification_minipage_row(
+    classification_table_latex: str,
+    classification_gap_table_latex: str,
+    classification_gap_plot_latex: str,
+) -> str:
+    classification_table_block = set_resizebox_width(extract_resizebox_block(classification_table_latex))
+    classification_gap_table_block = set_resizebox_width(extract_resizebox_block(classification_gap_table_latex))
+    classification_gap_plot_block = adapt_gap_tikz_for_small_minipage(
+        extract_tikzpicture_block(classification_gap_plot_latex)
+    )
+
+    lines: list[str] = []
+    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\centering")
+    lines.append(r"\begin{minipage}[t]{0.52\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\textbf{Overall Classification Accuracy}\\[2pt]")
+    lines.append(classification_table_block)
+    lines.append(r"\end{minipage}")
+    lines.append(r"\hfill")
+    lines.append(r"\begin{minipage}[t]{0.20\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\textbf{Classification Gap Table}\\[2pt]")
+    lines.append(classification_gap_table_block)
+    lines.append(r"\end{minipage}")
+    lines.append(r"\hfill")
+    lines.append(r"\begin{minipage}[t]{0.26\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\textbf{Classification Gap Graph}\\[2pt]")
+    lines.append(classification_gap_plot_block)
+    lines.append(r"\end{minipage}")
+    lines.append(
+        r"\caption{Side-by-side classification overview: overall accuracy table, classification gap table, and classification gap graph.}"
+    )
+    lines.append(r"\label{fig:classification-overview-minipage}")
+    lines.append(r"\end{figure}")
+    return "\n".join(lines)
+
+
 def main() -> None:
     repo_root = Path(__file__).resolve().parent
     output_path = repo_root / "preliminary_output.tex"
@@ -1343,6 +1460,11 @@ def main() -> None:
         methods=["knn", "tabpfn", "our_fm", "our_fm_knn"],
         percentages=TARGET_PERCENTAGE_CODES,
         data=cls_data,
+    )
+    figure_classification_overview_row = render_classification_minipage_row(
+        classification_table_latex=table_accuracy,
+        classification_gap_table_latex=table_accuracy_gap,
+        classification_gap_plot_latex=figure_classification_gap,
     )
 
     mae_gap_averages = compute_average_percentage_gap(
@@ -1541,11 +1663,7 @@ def main() -> None:
     )
 
     sections = [
-        table_accuracy
-        + "\n\n"
-        + table_accuracy_gap
-        + "\n\n"
-        + figure_classification_gap
+        figure_classification_overview_row
         + "\n\n"
         + figure_billing_accuracy
         + "\n\n"
