@@ -1338,6 +1338,45 @@ def render_classification_minipage_row(
     return "\n".join(lines)
 
 
+def render_mae_minipage_row(
+    mae_table_latex: str,
+    mae_gap_table_latex: str,
+    mae_gap_plot_latex: str,
+) -> str:
+    mae_table_block = set_resizebox_width(extract_resizebox_block(mae_table_latex))
+    mae_gap_table_block = set_resizebox_width(extract_resizebox_block(mae_gap_table_latex))
+    mae_gap_plot_block = adapt_gap_tikz_for_small_minipage(
+        extract_tikzpicture_block(mae_gap_plot_latex)
+    )
+
+    lines: list[str] = []
+    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\centering")
+    lines.append(r"\begin{minipage}[t]{0.52\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\textbf{Overall Regression MAE}\\[2pt]")
+    lines.append(mae_table_block)
+    lines.append(r"\end{minipage}")
+    lines.append(r"\hfill")
+    lines.append(r"\begin{minipage}[t]{0.20\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\textbf{MAE Gap Table}\\[2pt]")
+    lines.append(mae_gap_table_block)
+    lines.append(r"\end{minipage}")
+    lines.append(r"\hfill")
+    lines.append(r"\begin{minipage}[t]{0.26\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\textbf{MAE Gap Graph}\\[2pt]")
+    lines.append(mae_gap_plot_block)
+    lines.append(r"\end{minipage}")
+    lines.append(
+        r"\caption{Side-by-side regression MAE overview: overall MAE table, MAE gap table, and MAE gap graph.}"
+    )
+    lines.append(r"\label{fig:mae-overview-minipage}")
+    lines.append(r"\end{figure}")
+    return "\n".join(lines)
+
+
 def main() -> None:
     repo_root = Path(__file__).resolve().parent
     output_path = repo_root / "preliminary_output.tex"
@@ -1493,6 +1532,11 @@ def main() -> None:
         percentages=gap_percentages,
         selected_methods=["knn", "tabpfn", "our_fm", "our_fm_knn"],
         averages=mae_gap_averages,
+    )
+    figure_mae_overview_row = render_mae_minipage_row(
+        mae_table_latex=table_mae,
+        mae_gap_table_latex=table_mae_gap,
+        mae_gap_plot_latex=figure_mae_gap,
     )
     figure_billing_mae = render_regression_mae_tikz_plot(
         label="fig:billing-regression-mae-curves",
@@ -1672,11 +1716,7 @@ def main() -> None:
         + figure_billing_accuracy
         + "\n\n"
         + figure_helpdesk_accuracy,
-        table_mae
-        + "\n\n"
-        + table_mae_gap
-        + "\n\n"
-        + figure_mae_gap
+        figure_mae_overview_row
         + "\n\n"
         + figure_billing_mae
         + "\n\n"
