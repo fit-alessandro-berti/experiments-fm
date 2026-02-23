@@ -1277,11 +1277,15 @@ def adapt_gap_tikz_for_small_minipage(tikz_block: str) -> str:
         if stripped.startswith("height="):
             adjusted_lines.append(r"height=1.10\textwidth,")
             continue
-        if stripped.startswith("legend style=") or stripped.startswith("legend columns="):
+        if stripped.startswith("legend style="):
+            adjusted_lines.append(
+                r"legend style={at={(0.5,-0.30)}, anchor=north, font=\tiny, /tikz/every even column/.append style={column sep=4pt}},"
+            )
+            continue
+        if stripped.startswith("legend columns="):
+            adjusted_lines.append(r"legend columns=2,")
             continue
         if stripped.startswith("xtick={") or stripped.startswith("xticklabels={"):
-            continue
-        if stripped.startswith(r"\addlegendentry{"):
             continue
         if stripped == "grid=major,":
             adjusted_lines.append(line)
