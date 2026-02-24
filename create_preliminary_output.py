@@ -1883,14 +1883,14 @@ def render_regression_mae_and_r2_minipage_row(
         for line in tikz_block.splitlines():
             stripped = line.strip()
             if stripped.startswith("width="):
-                adjusted_lines.append(r"width=0.92\textwidth,")
+                adjusted_lines.append(r"width=0.88\textwidth,")
                 continue
             if stripped.startswith("height="):
-                adjusted_lines.append(r"height=0.60\textwidth,")
+                adjusted_lines.append(r"height=0.57\textwidth,")
                 continue
             if stripped.startswith("legend style="):
                 adjusted_lines.append(
-                    r"legend style={at={(0.5,-0.52)}, anchor=north, font=\tiny, /tikz/every even column/.append style={column sep=4pt}},"
+                    r"legend style={at={(0.5,-1.05)}, anchor=north, font=\tiny, /tikz/every even column/.append style={column sep=4pt}},"
                 )
                 continue
             adjusted_lines.append(line)
@@ -1898,29 +1898,32 @@ def render_regression_mae_and_r2_minipage_row(
 
     left_tikz_block = adapt_tikz_for_inner_pair(extract_tikzpicture_block(left_figure_latex))
     right_tikz_block = adapt_tikz_for_inner_pair(extract_tikzpicture_block(right_figure_latex))
-    r2_table_block = set_resizebox_width(extract_resizebox_block(r2_table_latex))
+    r2_table_block = set_resizebox_width(
+        extract_resizebox_block(r2_table_latex),
+        width_spec=r"0.90\textwidth",
+    )
 
     lines: list[str] = []
     lines.append(r"\begin{figure*}[!t]")
     lines.append(r"\centering")
     lines.append(r"\makebox[\textwidth][c]{%")
-    lines.append(r"\begin{minipage}[t]{0.6\textwidth}")
+    lines.append(r"\begin{minipage}[t]{0.61\textwidth}")
     lines.append(r"\centering")
     lines.append(r"\textbf{Regression MAE by Data Fraction}\\[2pt]")
-    lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
+    lines.append(r"\begin{minipage}[t]{0.47\textwidth}")
     lines.append(r"\centering")
     lines.append(r"\textbf{billing}\\[2pt]")
     lines.append(left_tikz_block)
     lines.append(r"\end{minipage}")
-    lines.append(r"\hfill")
-    lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
+    lines.append(r"\hspace{0.04\textwidth}")
+    lines.append(r"\begin{minipage}[t]{0.47\textwidth}")
     lines.append(r"\centering")
     lines.append(r"\textbf{sepsis}\\[2pt]")
     lines.append(right_tikz_block)
     lines.append(r"\end{minipage}")
     lines.append(r"\end{minipage}%")
-    lines.append(r"\hspace{0.01\textwidth}%")
-    lines.append(r"\begin{minipage}[t]{0.38\textwidth}")
+    lines.append(r"\hspace{0.02\textwidth}%")
+    lines.append(r"\begin{minipage}[t]{0.35\textwidth}")
     lines.append(r"\centering")
     lines.append(r"\textbf{Regression $R^2$}\\[2pt]")
     lines.append(r2_table_block)
