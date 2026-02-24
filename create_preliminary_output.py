@@ -1592,8 +1592,6 @@ def adapt_gap_tikz_for_small_minipage(tikz_block: str) -> str:
         if stripped.startswith("legend columns="):
             adjusted_lines.append(r"legend columns=2,")
             continue
-        if stripped.startswith("xtick={") or stripped.startswith("xticklabels={"):
-            continue
         if stripped == "grid=major,":
             adjusted_lines.append(line)
             adjusted_lines.append(r"scale only axis,")
@@ -1668,6 +1666,55 @@ def render_mae_minipage_row(
         r"\caption{Side-by-side regression MAE overview: overall MAE table and MAE gap graph.}"
     )
     lines.append(r"\label{fig:mae-overview-minipage}")
+    lines.append(r"\end{figure}")
+    return "\n".join(lines)
+
+
+def render_dual_tikz_minipage_figure(
+    left_figure_latex: str,
+    right_figure_latex: str,
+    left_title: str,
+    right_title: str,
+    caption: str,
+    label: str,
+) -> str:
+    def adapt_tikz_for_dual_minipage(tikz_block: str) -> str:
+        adjusted_lines: list[str] = []
+        for line in tikz_block.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("width="):
+                adjusted_lines.append(r"width=0.92\textwidth,")
+                continue
+            if stripped.startswith("height="):
+                adjusted_lines.append(r"height=0.60\textwidth,")
+                continue
+            if stripped.startswith("legend style="):
+                adjusted_lines.append(
+                    r"legend style={at={(0.5,-0.52)}, anchor=north, font=\tiny, /tikz/every even column/.append style={column sep=4pt}},"
+                )
+                continue
+            adjusted_lines.append(line)
+        return "\n".join(adjusted_lines)
+
+    left_tikz_block = adapt_tikz_for_dual_minipage(extract_tikzpicture_block(left_figure_latex))
+    right_tikz_block = adapt_tikz_for_dual_minipage(extract_tikzpicture_block(right_figure_latex))
+
+    lines: list[str] = []
+    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\centering")
+    lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
+    lines.append(r"\centering")
+    lines.append(rf"\textbf{{{latex_escape(left_title)}}}\\[2pt]")
+    lines.append(left_tikz_block)
+    lines.append(r"\end{minipage}")
+    lines.append(r"\hfill")
+    lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
+    lines.append(r"\centering")
+    lines.append(rf"\textbf{{{latex_escape(right_title)}}}\\[2pt]")
+    lines.append(right_tikz_block)
+    lines.append(r"\end{minipage}")
+    lines.append(rf"\caption{{{caption}}}")
+    lines.append(rf"\label{{{label}}}")
     lines.append(r"\end{figure}")
     return "\n".join(lines)
 
@@ -1803,6 +1850,17 @@ def main() -> None:
         classification_table_latex=table_accuracy,
         classification_gap_plot_latex=figure_classification_gap,
     )
+    figure_classification_accuracy_pair = render_dual_tikz_minipage_figure(
+        left_figure_latex=figure_billing_accuracy,
+        right_figure_latex=figure_helpdesk_accuracy,
+        left_title="billing",
+        right_title="helpdesk",
+        caption=(
+            "Classification accuracy percentages by data fraction shown side by side "
+            "for billing and helpdesk."
+        ),
+        label="fig:classification-accuracy-curves-billing-helpdesk-side-by-side",
+    )
 
     mae_gap_averages = compute_average_percentage_gap(
         methods=regression_methods,
@@ -1844,6 +1902,17 @@ def main() -> None:
         methods=["knn", "tabpfn", "our_fm", "our_fm_knn"],
         percentages=TARGET_PERCENTAGE_CODES,
         data=reg_data,
+    )
+    figure_regression_mae_pair = render_dual_tikz_minipage_figure(
+        left_figure_latex=figure_billing_mae,
+        right_figure_latex=figure_sepsis_mae,
+        left_title="billing",
+        right_title="sepsis",
+        caption=(
+            "Regression MAE by data fraction shown side by side "
+            "for billing and sepsis."
+        ),
+        label="fig:regression-mae-curves-billing-sepsis-side-by-side",
     )
 
     act_time_metrics_by_log = load_act_time_corr_metrics(act_time_corr_path)
@@ -2004,14 +2073,10 @@ def main() -> None:
     sections = [
         figure_classification_overview_row
         + "\n\n"
-        + figure_billing_accuracy
-        + "\n\n"
-        + figure_helpdesk_accuracy,
+        + figure_classification_accuracy_pair,
         figure_mae_overview_row
         + "\n\n"
-        + figure_billing_mae
-        + "\n\n"
-        + figure_sepsis_mae,
+        + figure_regression_mae_pair,
         table_r2,
     ]
     if classification_bucket_compact_figure:
