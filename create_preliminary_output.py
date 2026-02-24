@@ -67,18 +67,23 @@ def with_vertical_rules(column_specs: list[str]) -> str:
     return "|" + "|".join(column_specs) + "|"
 
 
-def build_ml_table_col_spec(prefix_columns: list[str], model_count: int, gap_count: int = 0) -> str:
+def build_ml_table_col_spec(
+    prefix_columns: list[str],
+    model_count: int,
+    gap_count: int = 0,
+    model_column_spec: str = MODEL_COLUMN_SPEC,
+) -> str:
     spec = "|" + "|".join(prefix_columns)
 
     if model_count > 0:
-        spec += THIN_MODEL_VRULE + MODEL_COLUMN_SPEC
+        spec += THIN_MODEL_VRULE + model_column_spec
         for _ in range(1, model_count):
-            spec += THIN_MODEL_VRULE + MODEL_COLUMN_SPEC
+            spec += THIN_MODEL_VRULE + model_column_spec
 
     if gap_count > 0:
-        spec += THICK_GAP_VRULE + MODEL_COLUMN_SPEC
+        spec += THICK_GAP_VRULE + model_column_spec
         for _ in range(1, gap_count):
-            spec += THICK_GAP_VRULE + MODEL_COLUMN_SPEC
+            spec += THICK_GAP_VRULE + model_column_spec
         spec += THICK_GAP_VRULE
     else:
         spec += "|"
@@ -675,6 +680,84 @@ def render_csv_table(
     lines.append(r"\hline")
     lines.append(r"\end{tabular}")
     lines.append(r"}")
+    lines.append(r"\end{table*}")
+    return "\n".join(lines)
+
+
+def render_fixed_width_csv_tabular(
+    rows: list[dict[str, str]],
+    column_order: list[str],
+    column_labels: dict[str, str],
+    column_width_cm: float = 1.5,
+) -> str:
+    fixed_col = rf">{{\centering\arraybackslash}}p{{{column_width_cm:.1f}cm}}"
+    col_spec = with_vertical_rules([fixed_col] * len(column_order))
+    lines: list[str] = []
+    lines.append(rf"\begin{{tabular}}{{{col_spec}}}")
+    lines.append(r"\hline")
+
+    header_cells = [rf"\textbf{{{latex_escape(column_labels.get(col, col))}}}" for col in column_order]
+    lines.append(" & ".join(header_cells) + r" \\")
+    lines.append(r"\hline")
+
+    for row in rows:
+        row_cells = [latex_escape(row.get(col, "")) for col in column_order]
+        lines.append(" & ".join(row_cells) + r" \\")
+
+    lines.append(r"\hline")
+    lines.append(r"\end{tabular}")
+    return "\n".join(lines)
+
+
+def render_expert_similarity_tables_pair(
+    title: str,
+    label: str,
+    intra_rows: list[dict[str, str]],
+    intra_columns: list[str],
+    intra_labels: dict[str, str],
+    inter_rows: list[dict[str, str]],
+    inter_columns: list[str],
+    inter_labels: dict[str, str],
+    column_width_cm: float = 1.5,
+) -> str:
+    lines: list[str] = []
+    lines.append(r"\begin{table*}[!t]")
+    lines.append(r"\centering")
+    lines.append(r"\scriptsize")
+
+    lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\textbf{Intra-expert metrics}\\[2pt]")
+    lines.append(r"\resizebox{\textwidth}{!}{%")
+    lines.append(
+        render_fixed_width_csv_tabular(
+            rows=intra_rows,
+            column_order=intra_columns,
+            column_labels=intra_labels,
+            column_width_cm=column_width_cm,
+        )
+    )
+    lines.append(r"}")
+    lines.append(r"\end{minipage}")
+    lines.append(r"\hfill")
+
+    lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\textbf{Inter-expert metrics}\\[2pt]")
+    lines.append(r"\resizebox{\textwidth}{!}{%")
+    lines.append(
+        render_fixed_width_csv_tabular(
+            rows=inter_rows,
+            column_order=inter_columns,
+            column_labels=inter_labels,
+            column_width_cm=column_width_cm,
+        )
+    )
+    lines.append(r"}")
+    lines.append(r"\end{minipage}")
+
+    lines.append(rf"\caption{{{title}}}")
+    lines.append(rf"\label{{{label}}}")
     lines.append(r"\end{table*}")
     return "\n".join(lines)
 
@@ -1327,6 +1410,7 @@ def render_table(
     higher_is_better: bool = True,
     gap_methods: list[str] | None = None,
     gap_decimals: int = 2,
+    model_column_spec: str = MODEL_COLUMN_SPEC,
 ) -> str:
     color_legend = (
         r"\textcolor{green}{\textbf{green}} = best, "
@@ -1338,6 +1422,7 @@ def render_table(
         prefix_columns=["l", "l"],
         model_count=len(methods),
         gap_count=len(gap_methods),
+        model_column_spec=model_column_spec,
     )
     lines: list[str] = []
     lines.append(r"\begin{table*}[!t]")
@@ -1788,6 +1873,67 @@ def render_dual_tikz_minipage_figure(
     return "\n".join(lines)
 
 
+def render_regression_mae_and_r2_minipage_row(
+    left_figure_latex: str,
+    right_figure_latex: str,
+    r2_table_latex: str,
+) -> str:
+    def adapt_tikz_for_inner_pair(tikz_block: str) -> str:
+        adjusted_lines: list[str] = []
+        for line in tikz_block.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("width="):
+                adjusted_lines.append(r"width=0.92\textwidth,")
+                continue
+            if stripped.startswith("height="):
+                adjusted_lines.append(r"height=0.60\textwidth,")
+                continue
+            if stripped.startswith("legend style="):
+                adjusted_lines.append(
+                    r"legend style={at={(0.5,-0.52)}, anchor=north, font=\tiny, /tikz/every even column/.append style={column sep=4pt}},"
+                )
+                continue
+            adjusted_lines.append(line)
+        return "\n".join(adjusted_lines)
+
+    left_tikz_block = adapt_tikz_for_inner_pair(extract_tikzpicture_block(left_figure_latex))
+    right_tikz_block = adapt_tikz_for_inner_pair(extract_tikzpicture_block(right_figure_latex))
+    r2_table_block = set_resizebox_width(extract_resizebox_block(r2_table_latex))
+
+    lines: list[str] = []
+    lines.append(r"\begin{figure*}[!t]")
+    lines.append(r"\centering")
+    lines.append(r"\makebox[\textwidth][c]{%")
+    lines.append(r"\begin{minipage}[t]{0.6\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\textbf{Regression MAE by Data Fraction}\\[2pt]")
+    lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\textbf{billing}\\[2pt]")
+    lines.append(left_tikz_block)
+    lines.append(r"\end{minipage}")
+    lines.append(r"\hfill")
+    lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\textbf{sepsis}\\[2pt]")
+    lines.append(right_tikz_block)
+    lines.append(r"\end{minipage}")
+    lines.append(r"\end{minipage}%")
+    lines.append(r"\hspace{0.01\textwidth}%")
+    lines.append(r"\begin{minipage}[t]{0.38\textwidth}")
+    lines.append(r"\centering")
+    lines.append(r"\textbf{Regression $R^2$}\\[2pt]")
+    lines.append(r2_table_block)
+    lines.append(r"\end{minipage}%")
+    lines.append(r"}")
+    lines.append(
+        r"\caption{Side-by-side regression overview: MAE by data fraction (billing and sepsis) and regression $R^2$ table.}"
+    )
+    lines.append(r"\label{fig:regression-mae-r2-overview-minipage}")
+    lines.append(r"\end{figure*}")
+    return "\n".join(lines)
+
+
 def main() -> None:
     repo_root = Path(__file__).resolve().parent
     output_path = repo_root / "preliminary_output.tex"
@@ -1876,6 +2022,7 @@ def main() -> None:
         data=reg_data,
         metric_keys=["r2"],
         decimals=3,
+        model_column_spec=r">{\centering\arraybackslash}p{1.2cm}",
     )
 
     gap_percentages = TARGET_PERCENTAGE_CODES
@@ -1972,16 +2119,10 @@ def main() -> None:
         percentages=TARGET_PERCENTAGE_CODES,
         data=reg_data,
     )
-    figure_regression_mae_pair = render_dual_tikz_minipage_figure(
+    figure_regression_mae_r2_overview = render_regression_mae_and_r2_minipage_row(
         left_figure_latex=figure_billing_mae,
         right_figure_latex=figure_sepsis_mae,
-        left_title="billing",
-        right_title="sepsis",
-        caption=(
-            "Regression MAE by data fraction shown side by side "
-            "for billing and sepsis."
-        ),
-        label="fig:regression-mae-curves-billing-sepsis-side-by-side",
+        r2_table_latex=table_r2,
     )
 
     act_time_metrics_by_log = load_act_time_corr_metrics(act_time_corr_path)
@@ -2033,63 +2174,59 @@ def main() -> None:
         )
 
     intra_expert_table_rows = load_comma_table(intra_expert_metrics_path)
-    intra_expert_table_latex: str | None = None
-    if intra_expert_table_rows:
-        intra_expert_columns = [
-            "log",
-            "expert",
-            "intra_centroid_cos",
-            "inter_centroid_cos",
-            "centroid_margin",
-            "knn_purity@5",
-            "knn_purity@10",
-        ]
-        intra_expert_labels = {
-            "log": "Event Log",
-            "expert": "Expert",
-            "intra_centroid_cos": "Intra Centroid Cos",
-            "inter_centroid_cos": "Inter Centroid Cos",
-            "centroid_margin": "Centroid Margin",
-            "knn_purity@5": "kNN Purity@5",
-            "knn_purity@10": "kNN Purity@10",
-        }
-        intra_expert_table_latex = render_csv_table(
-            title="Intra-expert similarity metrics.",
-            label="tab:intra-expert-similarity-metrics",
-            rows=intra_expert_table_rows,
-            column_order=intra_expert_columns,
-            column_labels=intra_expert_labels,
-        )
+    intra_expert_columns = [
+        "log",
+        "expert",
+        "intra_centroid_cos",
+        "inter_centroid_cos",
+        "centroid_margin",
+        "knn_purity@5",
+        "knn_purity@10",
+    ]
+    intra_expert_labels = {
+        "log": "Event Log",
+        "expert": "Expert",
+        "intra_centroid_cos": "Intra Centroid Cos",
+        "inter_centroid_cos": "Inter Centroid Cos",
+        "centroid_margin": "Centroid Margin",
+        "knn_purity@5": "kNN Purity@5",
+        "knn_purity@10": "kNN Purity@10",
+    }
 
     inter_expert_table_rows = load_comma_table(inter_expert_metrics_path)
-    inter_expert_table_latex: str | None = None
-    if inter_expert_table_rows:
-        inter_expert_columns = [
-            "log",
-            "expert_a",
-            "expert_b",
-            "classification_mean_cos",
-            "classification_mean_l2",
-            "classification_centroid_cos_mean",
-            "regression_mean_cos",
-            "regression_mean_l2",
-        ]
-        inter_expert_labels = {
-            "log": "Event Log",
-            "expert_a": "Expert A",
-            "expert_b": "Expert B",
-            "classification_mean_cos": "Cls Mean Cos",
-            "classification_mean_l2": "Cls Mean L2",
-            "classification_centroid_cos_mean": "Cls Centroid Cos Mean",
-            "regression_mean_cos": "Reg Mean Cos",
-            "regression_mean_l2": "Reg Mean L2",
-        }
-        inter_expert_table_latex = render_csv_table(
-            title="Inter-expert metrics.",
-            label="tab:inter-expert-metrics",
-            rows=inter_expert_table_rows,
-            column_order=inter_expert_columns,
-            column_labels=inter_expert_labels,
+    inter_expert_columns = [
+        "log",
+        "expert_a",
+        "expert_b",
+        "classification_mean_cos",
+        "classification_mean_l2",
+        "classification_centroid_cos_mean",
+        "regression_mean_cos",
+        "regression_mean_l2",
+    ]
+    inter_expert_labels = {
+        "log": "Event Log",
+        "expert_a": "Expert A",
+        "expert_b": "Expert B",
+        "classification_mean_cos": "Cls Mean Cos",
+        "classification_mean_l2": "Cls Mean L2",
+        "classification_centroid_cos_mean": "Cls Centroid Cos Mean",
+        "regression_mean_cos": "Reg Mean Cos",
+        "regression_mean_l2": "Reg Mean L2",
+    }
+
+    expert_similarity_tables_pair: str | None = None
+    if intra_expert_table_rows and inter_expert_table_rows:
+        expert_similarity_tables_pair = render_expert_similarity_tables_pair(
+            title="Intra-expert and inter-expert similarity metrics.",
+            label="tab:expert-similarity-metrics-pair",
+            intra_rows=intra_expert_table_rows,
+            intra_columns=intra_expert_columns,
+            intra_labels=intra_expert_labels,
+            inter_rows=inter_expert_table_rows,
+            inter_columns=inter_expert_columns,
+            inter_labels=inter_expert_labels,
+            column_width_cm=1.2,
         )
 
     bucket_rows_by_log = load_bucket_rows(buckets_path)
@@ -2138,8 +2275,7 @@ def main() -> None:
         + figure_classification_accuracy_pair,
         figure_mae_overview_row
         + "\n\n"
-        + figure_regression_mae_pair,
-        table_r2,
+        + figure_regression_mae_r2_overview,
     ]
     if classification_bucket_compact_figure:
         sections.append(
@@ -2159,13 +2295,11 @@ def main() -> None:
             + "\n\n"
             + correlation_tables_pair
         )
-    if intra_expert_table_latex and inter_expert_table_latex:
+    if expert_similarity_tables_pair:
         sections.append(
             r"\section{Expert Similarity Metrics}"
             + "\n\n"
-            + intra_expert_table_latex
-            + "\n\n"
-            + inter_expert_table_latex
+            + expert_similarity_tables_pair
         )
     body = "\n\n\\clearpage\\newpage\n\n".join(sections)
     tex_content = header + body + "\n\n\\end{document}\n"
