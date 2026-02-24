@@ -1579,10 +1579,10 @@ def adapt_gap_tikz_for_small_minipage(tikz_block: str) -> str:
         stripped = line.strip()
 
         if stripped.startswith("width="):
-            adjusted_lines.append(r"width=\textwidth,")
+            adjusted_lines.append(r"width=0.92\textwidth,")
             continue
         if stripped.startswith("height="):
-            adjusted_lines.append(r"height=1.10\textwidth,")
+            adjusted_lines.append(r"height=1.00\textwidth,")
             continue
         if stripped.startswith("legend style="):
             adjusted_lines.append(
@@ -1608,11 +1608,9 @@ def adapt_gap_tikz_for_small_minipage(tikz_block: str) -> str:
 
 def render_classification_minipage_row(
     classification_table_latex: str,
-    classification_gap_table_latex: str,
     classification_gap_plot_latex: str,
 ) -> str:
     classification_table_block = set_resizebox_width(extract_resizebox_block(classification_table_latex))
-    classification_gap_table_block = set_resizebox_width(extract_resizebox_block(classification_gap_table_latex))
     classification_gap_plot_block = adapt_gap_tikz_for_small_minipage(
         extract_tikzpicture_block(classification_gap_plot_latex)
     )
@@ -1620,25 +1618,21 @@ def render_classification_minipage_row(
     lines: list[str] = []
     lines.append(r"\begin{figure}[ht]")
     lines.append(r"\centering")
-    lines.append(r"\begin{minipage}[t]{0.52\textwidth}")
+    lines.append(r"\makebox[\textwidth][c]{%")
+    lines.append(r"\begin{minipage}[t]{0.6\textwidth}")
     lines.append(r"\centering")
     lines.append(r"\textbf{Overall Classification Accuracy}\\[2pt]")
     lines.append(classification_table_block)
-    lines.append(r"\end{minipage}")
-    lines.append(r"\hfill")
-    lines.append(r"\begin{minipage}[t]{0.20\textwidth}")
-    lines.append(r"\centering")
-    lines.append(r"\textbf{Classification Gap Table}\\[2pt]")
-    lines.append(classification_gap_table_block)
-    lines.append(r"\end{minipage}")
-    lines.append(r"\hfill")
-    lines.append(r"\begin{minipage}[t]{0.26\textwidth}")
+    lines.append(r"\end{minipage}%")
+    lines.append(r"\hspace{0.01\textwidth}%")
+    lines.append(r"\begin{minipage}[t]{0.38\textwidth}")
     lines.append(r"\centering")
     lines.append(r"\textbf{Classification Gap Graph}\\[2pt]")
     lines.append(classification_gap_plot_block)
-    lines.append(r"\end{minipage}")
+    lines.append(r"\end{minipage}%")
+    lines.append(r"}")
     lines.append(
-        r"\caption{Side-by-side classification overview: overall accuracy table, classification gap table, and classification gap graph.}"
+        r"\caption{Side-by-side classification overview: overall accuracy table and classification gap graph.}"
     )
     lines.append(r"\label{fig:classification-overview-minipage}")
     lines.append(r"\end{figure}")
@@ -1647,11 +1641,9 @@ def render_classification_minipage_row(
 
 def render_mae_minipage_row(
     mae_table_latex: str,
-    mae_gap_table_latex: str,
     mae_gap_plot_latex: str,
 ) -> str:
     mae_table_block = set_resizebox_width(extract_resizebox_block(mae_table_latex))
-    mae_gap_table_block = set_resizebox_width(extract_resizebox_block(mae_gap_table_latex))
     mae_gap_plot_block = adapt_gap_tikz_for_small_minipage(
         extract_tikzpicture_block(mae_gap_plot_latex)
     )
@@ -1659,25 +1651,21 @@ def render_mae_minipage_row(
     lines: list[str] = []
     lines.append(r"\begin{figure}[ht]")
     lines.append(r"\centering")
-    lines.append(r"\begin{minipage}[t]{0.52\textwidth}")
+    lines.append(r"\makebox[\textwidth][c]{%")
+    lines.append(r"\begin{minipage}[t]{0.6\textwidth}")
     lines.append(r"\centering")
     lines.append(r"\textbf{Overall Regression MAE}\\[2pt]")
     lines.append(mae_table_block)
-    lines.append(r"\end{minipage}")
-    lines.append(r"\hfill")
-    lines.append(r"\begin{minipage}[t]{0.20\textwidth}")
-    lines.append(r"\centering")
-    lines.append(r"\textbf{MAE Gap Table}\\[2pt]")
-    lines.append(mae_gap_table_block)
-    lines.append(r"\end{minipage}")
-    lines.append(r"\hfill")
-    lines.append(r"\begin{minipage}[t]{0.26\textwidth}")
+    lines.append(r"\end{minipage}%")
+    lines.append(r"\hspace{0.01\textwidth}%")
+    lines.append(r"\begin{minipage}[t]{0.38\textwidth}")
     lines.append(r"\centering")
     lines.append(r"\textbf{MAE Gap Graph}\\[2pt]")
     lines.append(mae_gap_plot_block)
-    lines.append(r"\end{minipage}")
+    lines.append(r"\end{minipage}%")
+    lines.append(r"}")
     lines.append(
-        r"\caption{Side-by-side regression MAE overview: overall MAE table, MAE gap table, and MAE gap graph.}"
+        r"\caption{Side-by-side regression MAE overview: overall MAE table and MAE gap graph.}"
     )
     lines.append(r"\label{fig:mae-overview-minipage}")
     lines.append(r"\end{figure}")
@@ -1813,7 +1801,6 @@ def main() -> None:
     )
     figure_classification_overview_row = render_classification_minipage_row(
         classification_table_latex=table_accuracy,
-        classification_gap_table_latex=table_accuracy_gap,
         classification_gap_plot_latex=figure_classification_gap,
     )
 
@@ -1842,7 +1829,6 @@ def main() -> None:
     )
     figure_mae_overview_row = render_mae_minipage_row(
         mae_table_latex=table_mae,
-        mae_gap_table_latex=table_mae_gap,
         mae_gap_plot_latex=figure_mae_gap,
     )
     figure_billing_mae = render_regression_mae_tikz_plot(
