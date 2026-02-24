@@ -512,7 +512,7 @@ def render_average_percentage_gap_table(
 ) -> str:
     col_spec = build_ml_table_col_spec(prefix_columns=["l"], model_count=len(selected_methods))
     lines: list[str] = []
-    lines.append(r"\begin{table}[ht]")
+    lines.append(r"\begin{table*}[!t]")
     lines.append(r"\centering")
     lines.append(r"\small")
     lines.append(rf"\caption{{{title}}}")
@@ -536,7 +536,7 @@ def render_average_percentage_gap_table(
     lines.append(r"\hline")
     lines.append(r"\end{tabular}")
     lines.append(r"}")
-    lines.append(r"\end{table}")
+    lines.append(r"\end{table*}")
     return "\n".join(lines)
 
 
@@ -548,13 +548,13 @@ def render_metric_gap_correlation_table(
     decimals: int = 3,
 ) -> str:
     lines: list[str] = []
-    lines.append(r"\begin{table}[ht]")
+    lines.append(r"\begin{table*}[!t]")
     lines.append(r"\centering")
     lines.append(r"\small")
     lines.append(rf"\caption{{{title}}}")
     lines.append(rf"\label{{{label}}}")
     lines.append(r"\resizebox{0.85\textwidth}{!}{%")
-    lines.append(r"\begin{tabular}{|p{0.60\textwidth}|c|c|}")
+    lines.append(r"\begin{tabular}{|p{5cm}|c|c|}")
     lines.append(r"\hline")
     lines.append(r"\textbf{Metric} & \textbf{Pearson $r$} & \textbf{Logs used} \\")
     lines.append(r"\hline")
@@ -569,7 +569,80 @@ def render_metric_gap_correlation_table(
     lines.append(r"\hline")
     lines.append(r"\end{tabular}")
     lines.append(r"}")
-    lines.append(r"\end{table}")
+    lines.append(r"\end{table*}")
+    return "\n".join(lines)
+
+
+def _render_metric_gap_correlation_tabular(
+    correlations: dict[str, tuple[float | None, int]],
+    metric_columns: list[str],
+    decimals: int = 3,
+) -> str:
+    lines: list[str] = []
+    lines.append(r"\begin{tabular}{|p{5cm}|c|c|}")
+    lines.append(r"\hline")
+    lines.append(r"\textbf{Metric} & \textbf{Pearson $r$} & \textbf{Logs used} \\")
+    lines.append(r"\hline")
+
+    for metric_name in metric_columns:
+        correlation, sample_size = correlations.get(metric_name, (None, 0))
+        corr_text = "" if correlation is None else f"{correlation:.{decimals}f}"
+        lines.append(
+            rf"{latex_escape(metric_name)} & {corr_text} & {sample_size} \\"
+        )
+
+    lines.append(r"\hline")
+    lines.append(r"\end{tabular}")
+    return "\n".join(lines)
+
+
+def render_metric_gap_correlation_table_pair(
+    title: str,
+    label: str,
+    left_subtitle: str,
+    right_subtitle: str,
+    left_correlations: dict[str, tuple[float | None, int]],
+    right_correlations: dict[str, tuple[float | None, int]],
+    metric_columns: list[str],
+    decimals: int = 3,
+) -> str:
+    lines: list[str] = []
+    lines.append(r"\begin{table*}[!t]")
+    lines.append(r"\centering")
+    lines.append(r"\small")
+
+    lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
+    lines.append(r"\centering")
+    lines.append(rf"\textbf{{{latex_escape(left_subtitle)}}}\\[2pt]")
+    lines.append(r"\resizebox{\textwidth}{!}{%")
+    lines.append(
+        _render_metric_gap_correlation_tabular(
+            correlations=left_correlations,
+            metric_columns=metric_columns,
+            decimals=decimals,
+        )
+    )
+    lines.append(r"}")
+    lines.append(r"\end{minipage}")
+    lines.append(r"\hfill")
+
+    lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
+    lines.append(r"\centering")
+    lines.append(rf"\textbf{{{latex_escape(right_subtitle)}}}\\[2pt]")
+    lines.append(r"\resizebox{\textwidth}{!}{%")
+    lines.append(
+        _render_metric_gap_correlation_tabular(
+            correlations=right_correlations,
+            metric_columns=metric_columns,
+            decimals=decimals,
+        )
+    )
+    lines.append(r"}")
+    lines.append(r"\end{minipage}")
+
+    lines.append(rf"\caption{{{title}}}")
+    lines.append(rf"\label{{{label}}}")
+    lines.append(r"\end{table*}")
     return "\n".join(lines)
 
 
@@ -582,7 +655,7 @@ def render_csv_table(
 ) -> str:
     col_spec = with_vertical_rules(["l"] + ["c"] * (len(column_order) - 1))
     lines: list[str] = []
-    lines.append(r"\begin{table}[ht]")
+    lines.append(r"\begin{table*}[!t]")
     lines.append(r"\centering")
     lines.append(r"\small")
     lines.append(rf"\caption{{{title}}}")
@@ -602,7 +675,7 @@ def render_csv_table(
     lines.append(r"\hline")
     lines.append(r"\end{tabular}")
     lines.append(r"}")
-    lines.append(r"\end{table}")
+    lines.append(r"\end{table*}")
     return "\n".join(lines)
 
 
@@ -615,7 +688,7 @@ def render_average_percentage_gap_tikz_plot(
     title: str | None = None,
 ) -> str:
     lines: list[str] = []
-    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\begin{figure*}[!t]")
     lines.append(r"\centering")
     lines.append(r"\begin{tikzpicture}")
 
@@ -688,7 +761,7 @@ def render_average_percentage_gap_tikz_plot(
         auto_title = title
     lines.append(rf"\caption{{{auto_title}}}")
     lines.append(rf"\label{{{label}}}")
-    lines.append(r"\end{figure}")
+    lines.append(r"\end{figure*}")
     return "\n".join(lines)
 
 
@@ -734,7 +807,7 @@ def render_classification_bucket_dual_tikz_plot(
         auto_title = title
 
     lines: list[str] = []
-    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\begin{figure*}[!t]")
     lines.append(r"\centering")
     lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
     lines.append(r"\centering")
@@ -800,7 +873,7 @@ def render_classification_bucket_dual_tikz_plot(
     lines.append(r"\end{minipage}")
     lines.append(rf"\caption{{{auto_title}}}")
     lines.append(rf"\label{{{label}}}")
-    lines.append(r"\end{figure}")
+    lines.append(r"\end{figure*}")
     return "\n".join(lines)
 
 
@@ -849,7 +922,7 @@ def render_classification_bucket_compact_figure(
         return None
 
     lines: list[str] = []
-    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\begin{figure*}[!t]")
     lines.append(r"\centering")
 
     lines.append(r"\begin{minipage}[t]{\textwidth}")
@@ -860,15 +933,14 @@ def render_classification_bucket_compact_figure(
             bucket_rows=bucket_rows_by_log[log_name],
             decimals=decimals,
         )
-        lines.append(r"\begin{minipage}[t]{0.30\textwidth}")
+        lines.append(r"\begin{minipage}[t]{0.29\textwidth}")
         lines.append(r"\centering")
         axis_options = [
-            r"width=\textwidth",
+            r"width=0.96\textwidth",
             r"height=0.62\textwidth",
             rf"title={{{latex_escape(log_name)}}}",
             r"xlabel={Bucket}",
             r"grid=major",
-            r"scale only axis",
             r"ymin=0",
             r"ymax=100",
             r"xtick={1,2,3,4,5}",
@@ -899,7 +971,7 @@ def render_classification_bucket_compact_figure(
         lines.append(r"\end{tikzpicture}")
         lines.append(r"\end{minipage}")
         if idx < len(available_logs) - 1:
-            lines.append(r"\hspace{0.02\textwidth}")
+            lines.append(r"\hspace{0.03\textwidth}")
     lines.append(r"\end{minipage}")
 
     lines.append(r"\vspace{16pt}")
@@ -911,15 +983,14 @@ def render_classification_bucket_compact_figure(
             bucket_rows=bucket_rows_by_log[log_name],
             decimals=decimals,
         )
-        lines.append(r"\begin{minipage}[t]{0.30\textwidth}")
+        lines.append(r"\begin{minipage}[t]{0.29\textwidth}")
         lines.append(r"\centering")
         axis_options = [
-            r"width=\textwidth",
+            r"width=0.96\textwidth",
             r"height=0.62\textwidth",
             rf"title={{{latex_escape(log_name)}}}",
             r"xlabel={log(1+median conf.)}",
             r"grid=major",
-            r"scale only axis",
             r"ymin=0",
             r"ymax=100",
             r"tick label style={font=\tiny}",
@@ -949,14 +1020,14 @@ def render_classification_bucket_compact_figure(
         lines.append(r"\end{tikzpicture}")
         lines.append(r"\end{minipage}")
         if idx < len(available_logs) - 1:
-            lines.append(r"\hspace{0.02\textwidth}")
+            lines.append(r"\hspace{0.03\textwidth}")
     lines.append(r"\end{minipage}")
 
     lines.append(
         r"\caption{Compact classification confidence-bucket comparison for receipt, roadtraffic, and sepsis. Left minipage: fixed buckets. Right minipage: confidence-range medians.}"
     )
     lines.append(rf"\label{{{label}}}")
-    lines.append(r"\end{figure}")
+    lines.append(r"\end{figure*}")
     return "\n".join(lines)
 
 
@@ -1002,7 +1073,7 @@ def render_regression_mae_bucket_dual_tikz_plot(
         auto_title = title
 
     lines: list[str] = []
-    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\begin{figure*}[!t]")
     lines.append(r"\centering")
     lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
     lines.append(r"\centering")
@@ -1064,7 +1135,7 @@ def render_regression_mae_bucket_dual_tikz_plot(
     lines.append(r"\end{minipage}")
     lines.append(rf"\caption{{{auto_title}}}")
     lines.append(rf"\label{{{label}}}")
-    lines.append(r"\end{figure}")
+    lines.append(r"\end{figure*}")
     return "\n".join(lines)
 
 
@@ -1112,7 +1183,7 @@ def render_regression_mae_bucket_compact_figure(
         return None
 
     lines: list[str] = []
-    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\begin{figure*}[!t]")
     lines.append(r"\centering")
 
     lines.append(r"\begin{minipage}[t]{\textwidth}")
@@ -1123,15 +1194,14 @@ def render_regression_mae_bucket_compact_figure(
             bucket_rows=bucket_rows_by_log[log_name],
             decimals=decimals,
         )
-        lines.append(r"\begin{minipage}[t]{0.30\textwidth}")
+        lines.append(r"\begin{minipage}[t]{0.29\textwidth}")
         lines.append(r"\centering")
         axis_options = [
-            r"width=\textwidth",
+            r"width=0.96\textwidth",
             r"height=0.62\textwidth",
             rf"title={{{latex_escape(log_name)}}}",
             r"xlabel={Bucket}",
             r"grid=major",
-            r"scale only axis",
             r"tick label style={font=\tiny}",
             r"label style={font=\scriptsize}",
             r"title style={font=\scriptsize}",
@@ -1159,7 +1229,7 @@ def render_regression_mae_bucket_compact_figure(
         lines.append(r"\end{tikzpicture}")
         lines.append(r"\end{minipage}")
         if idx < len(available_logs) - 1:
-            lines.append(r"\hspace{0.02\textwidth}")
+            lines.append(r"\hspace{0.03\textwidth}")
     lines.append(r"\end{minipage}")
 
     lines.append(r"\vspace{16pt}")
@@ -1171,15 +1241,14 @@ def render_regression_mae_bucket_compact_figure(
             bucket_rows=bucket_rows_by_log[log_name],
             decimals=decimals,
         )
-        lines.append(r"\begin{minipage}[t]{0.30\textwidth}")
+        lines.append(r"\begin{minipage}[t]{0.29\textwidth}")
         lines.append(r"\centering")
         axis_options = [
-            r"width=\textwidth",
+            r"width=0.96\textwidth",
             r"height=0.62\textwidth",
             rf"title={{{latex_escape(log_name)}}}",
             r"xlabel={log(1+median conf.)}",
             r"grid=major",
-            r"scale only axis",
             r"tick label style={font=\tiny}",
             r"label style={font=\scriptsize}",
             r"title style={font=\scriptsize}",
@@ -1207,14 +1276,14 @@ def render_regression_mae_bucket_compact_figure(
         lines.append(r"\end{tikzpicture}")
         lines.append(r"\end{minipage}")
         if idx < len(available_logs) - 1:
-            lines.append(r"\hspace{0.02\textwidth}")
+            lines.append(r"\hspace{0.03\textwidth}")
     lines.append(r"\end{minipage}")
 
     lines.append(
         r"\caption{Compact regression MAE confidence-bucket comparison for receipt, roadtraffic, and sepsis. Left minipage: fixed buckets. Right minipage: confidence-range medians.}"
     )
     lines.append(rf"\label{{{label}}}")
-    lines.append(r"\end{figure}")
+    lines.append(r"\end{figure*}")
     return "\n".join(lines)
 
 
@@ -1271,7 +1340,7 @@ def render_table(
         gap_count=len(gap_methods),
     )
     lines: list[str] = []
-    lines.append(r"\begin{table}[ht]")
+    lines.append(r"\begin{table*}[!t]")
     lines.append(r"\centering")
     lines.append(r"\small")
     lines.append(rf"\caption{{{title} {color_legend}}}")
@@ -1336,7 +1405,7 @@ def render_table(
 
     lines.append(r"\end{tabular}")
     lines.append(r"}")
-    lines.append(r"\end{table}")
+    lines.append(r"\end{table*}")
     return "\n".join(lines)
 
 
@@ -1350,7 +1419,7 @@ def render_accuracy_tikz_plot(
     title: str | None = None,
 ) -> str:
     lines: list[str] = []
-    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\begin{figure*}[!t]")
     lines.append(r"\centering")
     lines.append(r"\begin{tikzpicture}")
 
@@ -1426,7 +1495,7 @@ def render_accuracy_tikz_plot(
         auto_title = title
     lines.append(rf"\caption{{{auto_title}}}")
     lines.append(rf"\label{{{label}}}")
-    lines.append(r"\end{figure}")
+    lines.append(r"\end{figure*}")
     return "\n".join(lines)
 
 
@@ -1442,7 +1511,7 @@ def render_regression_mae_tikz_plot(
     transform: Callable[[float], float] | None = None,
 ) -> str:
     lines: list[str] = []
-    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\begin{figure*}[!t]")
     lines.append(r"\centering")
     lines.append(r"\begin{tikzpicture}")
 
@@ -1520,7 +1589,7 @@ def render_regression_mae_tikz_plot(
         auto_title = title
     lines.append(rf"\caption{{{auto_title}}}")
     lines.append(rf"\label{{{label}}}")
-    lines.append(r"\end{figure}")
+    lines.append(r"\end{figure*}")
     return "\n".join(lines)
 
 
@@ -1614,7 +1683,7 @@ def render_classification_minipage_row(
     )
 
     lines: list[str] = []
-    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\begin{figure*}[!t]")
     lines.append(r"\centering")
     lines.append(r"\makebox[\textwidth][c]{%")
     lines.append(r"\begin{minipage}[t]{0.6\textwidth}")
@@ -1633,7 +1702,7 @@ def render_classification_minipage_row(
         r"\caption{Side-by-side classification overview: overall accuracy table and classification gap graph.}"
     )
     lines.append(r"\label{fig:classification-overview-minipage}")
-    lines.append(r"\end{figure}")
+    lines.append(r"\end{figure*}")
     return "\n".join(lines)
 
 
@@ -1647,7 +1716,7 @@ def render_mae_minipage_row(
     )
 
     lines: list[str] = []
-    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\begin{figure*}[!t]")
     lines.append(r"\centering")
     lines.append(r"\makebox[\textwidth][c]{%")
     lines.append(r"\begin{minipage}[t]{0.6\textwidth}")
@@ -1666,7 +1735,7 @@ def render_mae_minipage_row(
         r"\caption{Side-by-side regression MAE overview: overall MAE table and MAE gap graph.}"
     )
     lines.append(r"\label{fig:mae-overview-minipage}")
-    lines.append(r"\end{figure}")
+    lines.append(r"\end{figure*}")
     return "\n".join(lines)
 
 
@@ -1700,7 +1769,7 @@ def render_dual_tikz_minipage_figure(
     right_tikz_block = adapt_tikz_for_dual_minipage(extract_tikzpicture_block(right_figure_latex))
 
     lines: list[str] = []
-    lines.append(r"\begin{figure}[ht]")
+    lines.append(r"\begin{figure*}[!t]")
     lines.append(r"\centering")
     lines.append(r"\begin{minipage}[t]{0.49\textwidth}")
     lines.append(r"\centering")
@@ -1715,7 +1784,7 @@ def render_dual_tikz_minipage_figure(
     lines.append(r"\end{minipage}")
     lines.append(rf"\caption{{{caption}}}")
     lines.append(rf"\label{{{label}}}")
-    lines.append(r"\end{figure}")
+    lines.append(r"\end{figure*}")
     return "\n".join(lines)
 
 
@@ -1917,8 +1986,7 @@ def main() -> None:
 
     act_time_metrics_by_log = load_act_time_corr_metrics(act_time_corr_path)
     metric_logs = sorted(act_time_metrics_by_log.keys())
-    classification_corr_table: str | None = None
-    mae_corr_table: str | None = None
+    correlation_tables_pair: str | None = None
     if metric_logs:
         classification_gap_by_log = compute_average_percentage_gap_by_log(
             methods=classification_methods,
@@ -1951,22 +2019,16 @@ def main() -> None:
             metric_columns=ACT_TIME_CORR_COLUMNS,
         )
 
-        classification_corr_table = render_metric_gap_correlation_table(
+        correlation_tables_pair = render_metric_gap_correlation_table_pair(
             title=(
-                "Pearson correlation between activity-time metrics and event-log average "
-                "classification gap to best (lower is better)."
+                "Pearson correlation between activity-time metrics and average gap-to-best "
+                "across event logs (classification and MAE)."
             ),
-            label="tab:activity-time-vs-classification-gap-correlation",
-            correlations=classification_metric_correlations,
-            metric_columns=ACT_TIME_CORR_COLUMNS,
-        )
-        mae_corr_table = render_metric_gap_correlation_table(
-            title=(
-                "Pearson correlation between activity-time metrics and event-log average "
-                "MAE gap to best (lower is better)."
-            ),
-            label="tab:activity-time-vs-mae-gap-correlation",
-            correlations=mae_metric_correlations,
+            label="tab:activity-time-vs-gap-correlation-pair",
+            left_subtitle="Classification Gap to Best (lower is better)",
+            right_subtitle="MAE Gap to Best (lower is better)",
+            left_correlations=classification_metric_correlations,
+            right_correlations=mae_metric_correlations,
             metric_columns=ACT_TIME_CORR_COLUMNS,
         )
 
@@ -2091,13 +2153,11 @@ def main() -> None:
             + "\n\n"
             + regression_mae_bucket_compact_figure
         )
-    if classification_corr_table and mae_corr_table:
+    if correlation_tables_pair:
         sections.append(
             r"\section{Activity-Time Correlation Analysis}"
             + "\n\n"
-            + classification_corr_table
-            + "\n\n"
-            + mae_corr_table
+            + correlation_tables_pair
         )
     if intra_expert_table_latex and inter_expert_table_latex:
         sections.append(
